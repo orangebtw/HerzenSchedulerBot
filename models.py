@@ -10,6 +10,9 @@ class User:
     group_id: str
     subgroup: int
     
+    def __hash__(self):
+        return hash(self.id)
+    
 @dataclass
 class UserNote:
     id: UUID = field(default_factory=UUID, init=False)
@@ -17,3 +20,6 @@ class UserNote:
     subject_id: str
     text: str
     time: datetime
+    
+    def __hash__(self):
+        return hash(self.id)

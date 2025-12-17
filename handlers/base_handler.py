@@ -1,0 +1,67 @@
+from aiogram import Router, Dispatcher, types, F
+from aiogram.fsm.state import StatesGroup, State
+from aiogram.fsm.context import FSMContext
+from aiogram.filters import CommandStart, StateFilter, Filter
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.enums.parse_mode import ParseMode
+
+import constants
+import keyboards
+import database
+
+from states import MainState
+
+from utils import NumCallbackData
+
+async def handle_start(message: types.Message):
+    await message.reply(f"Привет! Я <b>{constants.BOT_NAME}</b> – помогу организовать учебный процесс. Я буду запоминать твои заметки и дедлайны, привязывая их к расписанию.",
+                        reply_markup=keyboards.START_KEYBOARD,
+                        parse_mode=ParseMode.HTML)
+
+
+async def handle_cancel(call: types.CallbackQuery, state: FSMContext):
+    await state.clear()
+    
+    await call.answer()
+    await call.message.reply("Настройка отменена.")
+    await call.message.delete_reply_markup()
+
+async def handle_new_note(message: types.Message):
+    if not database.user_exists(message.from_user.id):
+        await message.answer("Я тебя не знаю. Пожалуйста, напиши /start и пройди регистрацию.")
+        return
+    print("NEW NOTE")
+
+
+async def handle_settings(message: types.Message, state: FSMContext):
+    if not database.user_exists(message.from_user.id):
+        await message.answer("Я тебя не знаю. Пожалуйста, напиши /start и пройди регистрацию.")
+        return
+    
+    builder = InlineKeyboardBuilder()
+    builder.add(types.InlineKeyboardButton(text="1", callback_data=NumCallbackData(num=1).pack()))
+    builder.add(types.InlineKeyboardButton(text="2", callback_data=NumCallbackData(num=2).pack()))
+    builder.add(types.InlineKeyboardButton(text="3", callback_data=NumCallbackData(num=3).pack()))
+    builder.add(types.InlineKeyboardButton(text="4", callback_data=NumCallbackData(num=4).pack()))
+    builder.add(types.InlineKeyboardButton(text="5", callback_data=NumCallbackData(num=5).pack()))
+    builder.add(types.InlineKeyboardButton(text="6", callback_data=NumCallbackData(num=6).pack()))
+    builder.row(keyboards.CANCEL_BUTTON)
+    
+    await message.answer("<b>Введите номер пункта, который хотите изменить</b>\n"
+                         f"1. 🎓 Группа: AAAAA\n"
+                         f"2. 🔔 Напоминания о дедлайнах: За 1 день и за 3 часа\n"
+                         f"3. 📊 Сводка: В 18:00\n"
+                         f"4. 📝 Расписание на день: За 1 час до первой пары\n"
+                         f"5. 🎯 Убеждаться в успешном выполнении задания: вкл\n"
+                         f"6. ℹ️ Связаться с админом\n",
+                         parse_mode=ParseMode.HTML,
+                         reply_markup=builder.as_markup())
+    
+    await state.set_state(MainState.Settings)
+
+
+def register(dp: Dispatcher):
+    dp.message.register(handle_start, CommandStart())
+    dp.callback_query.register(handle_cancel, F.data == keyboards.CANCEL_BUTTON.callback_data)
+    dp.message.register(handle_settings, F.text == keyboards.SETTINGS_BUTTON.text)
+    dp.message.register(handle_new_note)

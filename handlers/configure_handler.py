@@ -1,0 +1,147 @@
+from aiogram import Router, Dispatcher, types, F
+from aiogram.fsm.context import FSMContext
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+from aiogram.enums.parse_mode import ParseMode
+
+import utils
+import keyboards
+import models
+import database
+from states import ConfigureUserState
+
+async def handle_configure_group(message: types.Message, state: FSMContext):
+    with database.SCHEDULES_LOCK:
+        msg_text, keyboard = utils.generate_choice_message(database.SCHEDULES)
+    
+    await message.reply(f"<b>Выберите факультет</b>:\n\n{msg_text}", reply_markup=keyboard.as_markup(), parse_mode=ParseMode.HTML)
+    await state.set_state(ConfigureUserState.Faculty)
+
+
+async def handle_ask_faculty(call: types.CallbackQuery, callback_data: utils.NumCallbackData, state: FSMContext):
+    await call.answer()
+    await state.update_data(faculty=callback_data.num)
+    
+    with database.SCHEDULES_LOCK:
+        faculty = database.SCHEDULES[callback_data.num]
+        msg_text, keyboard = utils.generate_choice_message(faculty.forms)
+    
+    keyboard.row(keyboards.CANCEL_BUTTON)
+
+    await call.message.edit_text(f"Факультет: <b>{faculty.name}</b>\n\n<b>Выберите форму обучения</b>:\n\n{msg_text}",
+                                 reply_markup=keyboard.as_markup(),
+                                 parse_mode=ParseMode.HTML)
+    await state.set_state(ConfigureUserState.Form)
+
+
+async def handle_ask_form(call: types.CallbackQuery, callback_data: utils.NumCallbackData, state: FSMContext):
+    await call.answer()
+    await state.update_data(form=callback_data.num)
+    
+    faculty: int = await state.get_value("faculty")
+    
+    with database.SCHEDULES_LOCK:
+        form = database.SCHEDULES[faculty].forms[callback_data.num]
+        msg_text, keyboard = utils.generate_choice_message(form.stages)
+    
+    keyboard.row(keyboards.CANCEL_BUTTON)
+
+    await call.message.edit_text(f"Форма обучения: <b>{form.name}</b>\n\n<b>Выберите ступень обучения</b>:\n\n{msg_text}",
+                                 reply_markup=keyboard.as_markup(),
+                                 parse_mode=ParseMode.HTML)
+    await state.set_state(ConfigureUserState.Stage)
+
+
+async def handle_ask_stage(call: types.CallbackQuery, callback_data: utils.NumCallbackData, state: FSMContext):
+    await call.answer()
+    await state.update_data(stage=callback_data.num)
+    
+    faculty: int = await state.get_value("faculty")
+    form: int = await state.get_value("form")
+    
+    with database.SCHEDULES_LOCK:
+        stage = database.SCHEDULES[faculty].forms[form].stages[callback_data.num]
+        msg_text, keyboard = utils.generate_choice_message(stage.courses)
+    
+    keyboard.row(keyboards.CANCEL_BUTTON)
+
+    await call.message.edit_text(f"Ступень обучения: <b>{stage.name}</b>\n\n<b>Выберите курс</b>:\n\n{msg_text}",
+                                 reply_markup=keyboard.as_markup(),
+                                 parse_mode=ParseMode.HTML)
+    await state.set_state(ConfigureUserState.Course)
+
+
+async def handle_ask_course(call: types.CallbackQuery, callback_data: utils.NumCallbackData, state: FSMContext):
+    await call.answer()
+    await state.update_data(course=callback_data.num)
+    
+    faculty: int = await state.get_value("faculty")
+    form: int = await state.get_value("form")
+    stage: int = await state.get_value("stage")
+    
+    with database.SCHEDULES_LOCK:
+        course = database.SCHEDULES[faculty].forms[form].stages[stage].courses[callback_data.num]
+        msg_text, keyboard = utils.generate_choice_message(course.groups)
+
+    keyboard.row(keyboards.CANCEL_BUTTON)
+
+    await call.message.edit_text(f"Курс: <b>{course.name}</b>\n\n<b>Выберите группу</b>:\n\n{msg_text}",
+                                 reply_markup=keyboard.as_markup(),
+                                 parse_mode=ParseMode.HTML)
+    await state.set_state(ConfigureUserState.Group)
+
+
+async def handle_ask_group(call: types.CallbackQuery, callback_data: utils.NumCallbackData, state: FSMContext):
+    await call.answer()
+    
+    faculty: int = await state.get_value("faculty")
+    form: int = await state.get_value("form")
+    stage: int = await state.get_value("stage")
+    course: int = await state.get_value("course")
+    
+    with database.SCHEDULES_LOCK:
+        group_id = database.SCHEDULES[faculty].forms[form].stages[stage].courses[course].groups[callback_data.num].id
+    
+    await state.update_data(group_id=group_id)
+    
+    builder = InlineKeyboardBuilder()
+    builder.row(types.InlineKeyboardButton(text='Без подгруппы', callback_data=utils.NumCallbackData(num=0).pack()))
+    builder.row(
+        types.InlineKeyboardButton(text='1', callback_data=utils.NumCallbackData(num=1).pack()),
+        types.InlineKeyboardButton(text='2', callback_data=utils.NumCallbackData(num=2).pack())
+    )
+    
+    builder.row(keyboards.CANCEL_BUTTON)
+    
+    await call.message.edit_text("Выберите номер <b>подгруппы</b>, если такая есть. Если нет, нажмите кнопку <b>\"Без подгруппы\"</b>",
+                                 reply_markup=builder.as_markup(),
+                                 parse_mode=ParseMode.HTML)
+
+    await state.set_state(ConfigureUserState.SubGroup)
+    
+
+async def handle_ask_subgroup(call: types.CallbackQuery, callback_data: utils.NumCallbackData, state: FSMContext):
+    await call.answer()
+    
+    data = await state.get_data()
+    group_id = data['group_id']
+    subgroup = callback_data.num
+    user_id = call.from_user.id
+    
+    database.add_user(models.User(user_id, group_id, subgroup))
+    
+    await call.message.edit_text("<b>Отлично, всё готово!</b> 🎉", parse_mode=ParseMode.HTML)
+    
+    await call.message.answer("Теперь я могу привязывать твои заметки к расписанию.\n"
+                              "Просто напиши мне что-нибудь во время пары — я пойму, к какому предмету это относится.", reply_markup=keyboards.MAIN_KEYBOARD)
+    
+    await state.clear()
+    
+    
+def register(dp: Dispatcher, router: Router):
+    dp.message.register(handle_configure_group, F.text == keyboards.CONFIGURE_GROUP_BUTTON.text)
+    router.callback_query.register(handle_ask_faculty, utils.NumCallbackData.filter(), ConfigureUserState.Faculty)
+    router.callback_query.register(handle_ask_form, utils.NumCallbackData.filter(), ConfigureUserState.Form)
+    router.callback_query.register(handle_ask_stage, utils.NumCallbackData.filter(), ConfigureUserState.Stage)
+    router.callback_query.register(handle_ask_course, utils.NumCallbackData.filter(), ConfigureUserState.Course)
+    router.callback_query.register(handle_ask_group, utils.NumCallbackData.filter(), ConfigureUserState.Group)
+    router.callback_query.register(handle_ask_subgroup, utils.NumCallbackData.filter(), ConfigureUserState.SubGroup)
