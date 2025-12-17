@@ -4,10 +4,15 @@ from datetime import datetime
 
 type UserId = int
 
+@dataclass(frozen=True)
+class UserGroup:
+    id: str
+    name: str
+
 @dataclass
 class User:
     id: UserId
-    group_id: str
+    group: UserGroup
     subgroup: int
     
     def __hash__(self):

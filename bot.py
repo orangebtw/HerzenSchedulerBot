@@ -1,7 +1,7 @@
 import asyncio
 from aiogram import Router, Bot, Dispatcher
 
-from handlers import configure_handler, base_handler
+from handlers import base_handler, register_handler, settings_handler
 
 import utils
 import database
@@ -21,12 +21,16 @@ async def on_startup():
     loop.create_task(update_groups('00:00'))
     
 async def main():
-    user_data_router = Router()
-    configure_handler.register(dp, user_data_router)
+    registration_router = Router()
+    settings_router = Router()
+    
+    register_handler.register(dp, registration_router)
+    settings_handler.register(settings_router)
     base_handler.register(dp)
     
     dp.startup.register(on_startup)
-    dp.include_router(user_data_router)
+    dp.include_router(registration_router)
+    dp.include_router(settings_router)
     
     await dp.start_polling(bot)
     

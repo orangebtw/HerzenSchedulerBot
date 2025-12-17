@@ -9,7 +9,7 @@ import constants
 import keyboards
 import database
 
-from states import MainState
+from states import MainState, ConfigureUserState
 
 from utils import NumCallbackData
 
@@ -26,17 +26,23 @@ async def handle_cancel(call: types.CallbackQuery, state: FSMContext):
     await call.message.reply("Настройка отменена.")
     await call.message.delete_reply_markup()
 
-async def handle_new_note(message: types.Message):
+
+async def check_user_exists(message: types.Message) -> bool:
     if not database.user_exists(message.from_user.id):
         await message.answer("Я тебя не знаю. Пожалуйста, напиши /start и пройди регистрацию.")
-        return
+        return False
+    return True
+
+async def handle_new_note(message: types.Message):
+    if not await check_user_exists(message): return
+    
     print("NEW NOTE")
 
 
 async def handle_settings(message: types.Message, state: FSMContext):
-    if not database.user_exists(message.from_user.id):
-        await message.answer("Я тебя не знаю. Пожалуйста, напиши /start и пройди регистрацию.")
-        return
+    if not await check_user_exists(message): return
+    
+    user = database.get_user_by_id(message.from_user.id)
     
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(text="1", callback_data=NumCallbackData(num=1).pack()))
@@ -47,8 +53,8 @@ async def handle_settings(message: types.Message, state: FSMContext):
     builder.add(types.InlineKeyboardButton(text="6", callback_data=NumCallbackData(num=6).pack()))
     builder.row(keyboards.CANCEL_BUTTON)
     
-    await message.answer("<b>Введите номер пункта, который хотите изменить</b>\n"
-                         f"1. 🎓 Группа: AAAAA\n"
+    await message.answer("<b>Введите номер пункта, который хотите изменить.</b>\n"
+                         f"1. 🎓 Группа: {user.group.name}\n"
                          f"2. 🔔 Напоминания о дедлайнах: За 1 день и за 3 часа\n"
                          f"3. 📊 Сводка: В 18:00\n"
                          f"4. 📝 Расписание на день: За 1 час до первой пары\n"
@@ -58,7 +64,6 @@ async def handle_settings(message: types.Message, state: FSMContext):
                          reply_markup=builder.as_markup())
     
     await state.set_state(MainState.Settings)
-
 
 def register(dp: Dispatcher):
     dp.message.register(handle_start, CommandStart())
