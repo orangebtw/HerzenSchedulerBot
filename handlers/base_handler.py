@@ -1,15 +1,15 @@
-from aiogram import Router, Dispatcher, types, F
-from aiogram.fsm.state import StatesGroup, State
+from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
-from aiogram.filters import CommandStart, StateFilter, Filter
+from aiogram.filters import CommandStart, StateFilter
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.enums.parse_mode import ParseMode
 
 import constants
 import keyboards
 import database
+import utils
 
-from states import MainState, ConfigureUserState
+from states import MainState
 
 from utils import NumCallbackData
 
@@ -53,20 +53,22 @@ async def handle_settings(message: types.Message, state: FSMContext):
     builder.add(types.InlineKeyboardButton(text="6", callback_data=NumCallbackData(num=6).pack()))
     builder.row(keyboards.CANCEL_BUTTON)
     
+    reminder_times_text = utils.user_reminder_times_to_text(user)
+    
     await message.answer("<b>Введите номер пункта, который хотите изменить.</b>\n"
-                         f"1. 🎓 Группа: {user.group.name}\n"
-                         f"2. 🔔 Напоминания о дедлайнах: За 1 день и за 3 часа\n"
-                         f"3. 📊 Сводка: В 18:00\n"
-                         f"4. 📝 Расписание на день: За 1 час до первой пары\n"
-                         f"5. 🎯 Убеждаться в успешном выполнении задания: вкл\n"
-                         f"6. ℹ️ Связаться с админом\n",
+                         f"1. 🎓  Группа: {user.group.name}\n"
+                         f"2. 🔔  Напоминания о дедлайнах: {reminder_times_text}\n"
+                         f"3. 📊  Сводка: В 18:00\n"
+                         f"4. 📝  Расписание на день: За 1 час до первой пары\n"
+                         f"5. 🎯  Убеждаться в успешном выполнении задания: вкл\n"
+                         f"6. ℹ️  Связаться с админом\n",
                          parse_mode=ParseMode.HTML,
                          reply_markup=builder.as_markup())
     
     await state.set_state(MainState.Settings)
 
-def register(dp: Dispatcher):
-    dp.message.register(handle_start, CommandStart())
-    dp.callback_query.register(handle_cancel, F.data == keyboards.CANCEL_BUTTON.callback_data)
-    dp.message.register(handle_settings, F.text == keyboards.SETTINGS_BUTTON.text)
-    dp.message.register(handle_new_note)
+def register(router: Router):
+    router.message.register(handle_start, CommandStart())
+    router.callback_query.register(handle_cancel, F.data == keyboards.CANCEL_BUTTON.callback_data)
+    router.message.register(handle_settings, StateFilter(None), F.text == keyboards.SETTINGS_BUTTON.text)
+    router.message.register(handle_new_note, StateFilter(None))

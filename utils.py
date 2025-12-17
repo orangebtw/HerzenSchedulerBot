@@ -5,6 +5,8 @@ from aiogram.types import InlineKeyboardMarkup
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
+import models
+
 DEFAULT_TIMEZONE = "Europe/Moscow"
 
 class NumCallbackData(CallbackData, prefix="data-int"):
@@ -28,3 +30,39 @@ def generate_choice_message(iterable: Iterable) -> tuple[str, InlineKeyboardBuil
         msg_text += '\n'
         builder.button(text=str(i+1), callback_data=NumCallbackData(num=i).pack())
     return (msg_text, builder)
+
+def user_reminder_times_to_text(user: models.User) -> str:
+    reminder_times_length = sum(True for x in user.reminder_times if x is not None)
+    reminder_times_text = "За "
+    
+    for i, reminder_time in enumerate(user.reminder_times):
+        if reminder_time is None:
+            continue
+        
+        t = reminder_time.value
+        
+        if i > 0 and i == reminder_times_length - 1:
+            reminder_times_text += " и за "
+        elif i > 0 and i < reminder_times_length - 1:
+            reminder_times_text += ", за "
+            
+        secs = t.total_seconds()
+        
+        if secs >= 86400:
+            d = int(secs / 86400)
+            secs -= secs * 86400
+            reminder_times_text += f"<b>{d} д.</b>"
+            if secs > 0:
+                reminder_times_text += " "
+            
+        if secs >= 3600:
+            h = int(secs / 3600)
+            secs -= secs * 3600
+            reminder_times_text += f"<b>{h} ч.</b>"
+            if secs > 0:
+                reminder_times_text += " "
+            
+        if secs >= 60:
+            m = int(secs / 60)
+            reminder_times_text += f"<b>{m} м.</b>"
+    return reminder_times_text

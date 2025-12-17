@@ -2,6 +2,7 @@ from aiogram import Router, Dispatcher, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.enums.parse_mode import ParseMode
+from aiogram.filters import StateFilter
 
 import utils
 import keyboards
@@ -140,11 +141,11 @@ async def handle_ask_subgroup(call: types.CallbackQuery, callback_data: utils.Nu
     await state.clear()
     
     
-def register(dp: Dispatcher, router: Router):
-    dp.message.register(handle_configure_group, F.text == keyboards.CONFIGURE_GROUP_BUTTON.text)
-    router.callback_query.register(handle_ask_faculty, utils.NumCallbackData.filter(), RegisterUserState.Faculty)
-    router.callback_query.register(handle_ask_form, utils.NumCallbackData.filter(), RegisterUserState.Form)
-    router.callback_query.register(handle_ask_stage, utils.NumCallbackData.filter(), RegisterUserState.Stage)
-    router.callback_query.register(handle_ask_course, utils.NumCallbackData.filter(), RegisterUserState.Course)
-    router.callback_query.register(handle_ask_group, utils.NumCallbackData.filter(), RegisterUserState.Group)
-    router.callback_query.register(handle_ask_subgroup, utils.NumCallbackData.filter(), RegisterUserState.SubGroup)
+def register(router: Router):
+    router.message.register(handle_configure_group, StateFilter(None), F.text == keyboards.CONFIGURE_GROUP_BUTTON.text)
+    router.callback_query.register(handle_ask_faculty, StateFilter(RegisterUserState.Faculty), utils.NumCallbackData.filter())
+    router.callback_query.register(handle_ask_form, StateFilter(RegisterUserState.Form), utils.NumCallbackData.filter())
+    router.callback_query.register(handle_ask_stage, StateFilter(RegisterUserState.Stage), utils.NumCallbackData.filter())
+    router.callback_query.register(handle_ask_course, StateFilter(RegisterUserState.Course), utils.NumCallbackData.filter())
+    router.callback_query.register(handle_ask_group, StateFilter(RegisterUserState.Group), utils.NumCallbackData.filter())
+    router.callback_query.register(handle_ask_subgroup, StateFilter(RegisterUserState.SubGroup), utils.NumCallbackData.filter())

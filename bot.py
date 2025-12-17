@@ -1,7 +1,7 @@
 import asyncio
 from aiogram import Router, Bot, Dispatcher
 
-from handlers import base_handler, register_handler, settings_handler
+from handlers import base_handler, register_handler, configure_user_handler, configure_reminders_handler
 
 import utils
 import database
@@ -22,15 +22,20 @@ async def on_startup():
     
 async def main():
     registration_router = Router()
-    settings_router = Router()
+    configure_user_router = Router()
+    configure_reminders_router = Router()
+    base_router = Router()
     
-    register_handler.register(dp, registration_router)
-    settings_handler.register(settings_router)
-    base_handler.register(dp)
+    register_handler.register(registration_router)
+    configure_user_handler.register(configure_user_router)
+    configure_reminders_handler.register(configure_reminders_router)
+    base_handler.register(base_router)
     
     dp.startup.register(on_startup)
     dp.include_router(registration_router)
-    dp.include_router(settings_router)
+    dp.include_router(configure_user_router)
+    dp.include_router(configure_reminders_router)
+    dp.include_router(base_router)
     
     await dp.start_polling(bot)
     

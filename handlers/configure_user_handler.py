@@ -135,6 +135,7 @@ async def handle_ask_subgroup(call: types.CallbackQuery, callback_data: utils.Nu
     assert(user is not None)
     
     user.group = models.UserGroup(group_id, group_name)
+    user.subgroup = subgroup
     
     await call.message.edit_text("✅ <b>Группа успешна обновлена!</b>", parse_mode=ParseMode.HTML)
     
@@ -142,10 +143,10 @@ async def handle_ask_subgroup(call: types.CallbackQuery, callback_data: utils.Nu
     
     
 def register(router: Router):
-    router.callback_query.register(handle_configure_group, MainState.Settings, utils.NumCallbackData.filter(F.num == 1))
-    router.callback_query.register(handle_ask_faculty, ConfigureUserState.Faculty, utils.NumCallbackData.filter())
-    router.callback_query.register(handle_ask_form, ConfigureUserState.Form, utils.NumCallbackData.filter())
-    router.callback_query.register(handle_ask_stage, ConfigureUserState.Stage, utils.NumCallbackData.filter())
-    router.callback_query.register(handle_ask_course, ConfigureUserState.Course, utils.NumCallbackData.filter())
-    router.callback_query.register(handle_ask_group, ConfigureUserState.Group, utils.NumCallbackData.filter())
-    router.callback_query.register(handle_ask_subgroup, ConfigureUserState.SubGroup, utils.NumCallbackData.filter())
+    router.callback_query.register(handle_configure_group, StateFilter(MainState.Settings), utils.NumCallbackData.filter(F.num == 1))
+    router.callback_query.register(handle_ask_faculty, StateFilter(ConfigureUserState.Faculty), utils.NumCallbackData.filter())
+    router.callback_query.register(handle_ask_form, StateFilter(ConfigureUserState.Form), utils.NumCallbackData.filter())
+    router.callback_query.register(handle_ask_stage, StateFilter(ConfigureUserState.Stage), utils.NumCallbackData.filter())
+    router.callback_query.register(handle_ask_course, StateFilter(ConfigureUserState.Course), utils.NumCallbackData.filter())
+    router.callback_query.register(handle_ask_group, StateFilter(ConfigureUserState.Group), utils.NumCallbackData.filter())
+    router.callback_query.register(handle_ask_subgroup, StateFilter(ConfigureUserState.SubGroup), utils.NumCallbackData.filter())

@@ -18,3 +18,7 @@ class ConfigureUserState(StatesGroup):
     Course = State()
     Group = State()
     SubGroup = State()
+    
+class ConfigureReminderState(StatesGroup):
+    AskTime = State()
+    GetTime = State()
