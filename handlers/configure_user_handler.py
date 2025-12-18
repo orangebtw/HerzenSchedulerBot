@@ -1,8 +1,7 @@
-from aiogram import Router, Dispatcher, types, F
+from aiogram import Router, types, F
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.enums.parse_mode import ParseMode
 
 import utils
 import keyboards
@@ -16,7 +15,7 @@ async def handle_configure_group(call: types.CallbackQuery, state: FSMContext):
         
     keyboard.row(keyboards.CANCEL_BUTTON)
     
-    await call.message.edit_text(f"<b>Выберите факультет</b>:\n\n{msg_text}", reply_markup=keyboard.as_markup(), parse_mode=ParseMode.HTML)
+    await call.message.edit_text(f"<b>Выберите факультет</b>:\n\n{msg_text}", reply_markup=keyboard.as_markup())
     await state.set_state(ConfigureUserState.Faculty)
 
 
@@ -31,8 +30,7 @@ async def handle_ask_faculty(call: types.CallbackQuery, callback_data: utils.Num
     keyboard.row(keyboards.CANCEL_BUTTON)
 
     await call.message.edit_text(f"Факультет: <b>{faculty.name}</b>\n\n<b>Выберите форму обучения</b>:\n\n{msg_text}",
-                                 reply_markup=keyboard.as_markup(),
-                                 parse_mode=ParseMode.HTML)
+                                 reply_markup=keyboard.as_markup())
     await state.set_state(ConfigureUserState.Form)
 
 
@@ -49,8 +47,7 @@ async def handle_ask_form(call: types.CallbackQuery, callback_data: utils.NumCal
     keyboard.row(keyboards.CANCEL_BUTTON)
 
     await call.message.edit_text(f"Форма обучения: <b>{form.name}</b>\n\n<b>Выберите ступень обучения</b>:\n\n{msg_text}",
-                                 reply_markup=keyboard.as_markup(),
-                                 parse_mode=ParseMode.HTML)
+                                 reply_markup=keyboard.as_markup())
     await state.set_state(ConfigureUserState.Stage)
 
 
@@ -68,8 +65,7 @@ async def handle_ask_stage(call: types.CallbackQuery, callback_data: utils.NumCa
     keyboard.row(keyboards.CANCEL_BUTTON)
 
     await call.message.edit_text(f"Ступень обучения: <b>{stage.name}</b>\n\n<b>Выберите курс</b>:\n\n{msg_text}",
-                                 reply_markup=keyboard.as_markup(),
-                                 parse_mode=ParseMode.HTML)
+                                 reply_markup=keyboard.as_markup())
     await state.set_state(ConfigureUserState.Course)
 
 
@@ -88,8 +84,7 @@ async def handle_ask_course(call: types.CallbackQuery, callback_data: utils.NumC
     keyboard.row(keyboards.CANCEL_BUTTON)
 
     await call.message.edit_text(f"Курс: <b>{course.name}</b>\n\n<b>Выберите группу</b>:\n\n{msg_text}",
-                                 reply_markup=keyboard.as_markup(),
-                                 parse_mode=ParseMode.HTML)
+                                 reply_markup=keyboard.as_markup())
     await state.set_state(ConfigureUserState.Group)
 
 
@@ -118,8 +113,7 @@ async def handle_ask_group(call: types.CallbackQuery, callback_data: utils.NumCa
     
     await call.message.edit_text(f"Группа: <b>{group.name}</b>\n"
                                  "Выберите номер <b>подгруппы</b>, если такая есть. Если нет, нажмите кнопку <b>\"Без подгруппы\"</b>",
-                                 reply_markup=builder.as_markup(),
-                                 parse_mode=ParseMode.HTML)
+                                 reply_markup=builder.as_markup())
 
     await state.set_state(ConfigureUserState.SubGroup)
     
@@ -138,7 +132,7 @@ async def handle_ask_subgroup(call: types.CallbackQuery, callback_data: utils.Nu
     
     user.group = models.UserGroupWithName(group_name, group_id, subgroup)
     
-    await call.message.edit_text("✅ <b>Группа успешна обновлена!</b>", parse_mode=ParseMode.HTML)
+    await call.message.edit_text("✅ <b>Группа успешна обновлена!</b>")
     
     await state.clear()
     

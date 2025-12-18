@@ -1,5 +1,9 @@
 import asyncio
 from aiogram import Router, Bot, Dispatcher
+from aiogram_dialog import setup_dialogs
+
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums.parse_mode import ParseMode
 
 from handlers import base_handler, register_handler, configure_user_handler, configure_reminders_handler
 
@@ -7,7 +11,7 @@ import utils
 import database
 import constants
 
-bot = Bot(token=constants.BOT_TOKEN)
+bot = Bot(token=constants.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
 
 async def update_groups_and_clear_schedules(time: str):
@@ -39,6 +43,8 @@ async def main():
     dp.include_router(configure_user_router)
     dp.include_router(configure_reminders_router)
     dp.include_router(base_router)
+    
+    setup_dialogs(dp)
     
     await dp.start_polling(bot)
     

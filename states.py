@@ -22,3 +22,9 @@ class ConfigureUserState(StatesGroup):
 class ConfigureReminderState(StatesGroup):
     AskTime = State()
     GetTime = State()
+    
+class NoteCreationState(StatesGroup):
+    IsCurrentSubjectCorrect = State()
+    NoSubjectCurrently = State()
+    AskDueDate = State()
+    AskCustomSubject = State()

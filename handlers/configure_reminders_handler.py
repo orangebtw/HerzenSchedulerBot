@@ -2,7 +2,6 @@ from aiogram import Router, types, F
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.enums.parse_mode import ParseMode
 from datetime import timedelta
 
 import utils
@@ -38,8 +37,7 @@ async def handle_ask_time(call: types.CallbackQuery, callback_data: utils.NumCal
     builder.row(keyboards.CANCEL_BUTTON)
     
     await call.message.edit_text(f"⏰ Укажите количесто <b>часов</b> от {range_from} до 168 включительно, за которое необходимо напоминать в 1-й раз.",
-                                 reply_markup=builder.as_markup(),
-                                 parse_mode=ParseMode.HTML)
+                                 reply_markup=builder.as_markup())
     
     await state.set_state(ConfigureReminderState.GetTime)
 
@@ -79,12 +77,10 @@ async def handle_get_time(message: types.Message, state: FSMContext):
         
         if total > 1 and current == total:
             await message.answer(f"⏰ Укажите количесто <b>минут</b> от {range_start} до {range_end} включительно, за которое необходимо напоминать в {current}-й раз.",
-                                reply_markup=builder.as_markup(),
-                                parse_mode=ParseMode.HTML)
+                                reply_markup=builder.as_markup())
         else:
             await message.answer(f"⏰ Укажите количесто <b>часов</b> от {range_start} до {range_end} включительно, за которое необходимо напоминать в {current}-й раз.",
-                                reply_markup=builder.as_markup(),
-                                parse_mode=ParseMode.HTML)
+                                reply_markup=builder.as_markup())
     else:
         user = database.get_user_by_id(message.from_user.id)
         assert(user is not None)
@@ -97,7 +93,7 @@ async def handle_get_time(message: types.Message, state: FSMContext):
         
         user.reminder_times = tuple(reminder_times)
         
-        await message.answer("✅ <b>Напоминания о дедлайнах успешно обновлены!</b>", parse_mode=ParseMode.HTML)
+        await message.answer("✅ <b>Напоминания о дедлайнах успешно обновлены!</b>")
         
         await state.clear()
 

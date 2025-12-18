@@ -4,7 +4,10 @@ from aiogram.filters.callback_data import CallbackData
 from aiogram.types import InlineKeyboardMarkup
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
+from contextlib import contextmanager
 
+import threading
+import locale
 import models
 
 DEFAULT_TIMEZONE = ZoneInfo("Europe/Moscow")
@@ -66,3 +69,14 @@ def user_reminder_times_to_text(user: models.User) -> str:
             m = int(secs / 60)
             reminder_times_text += f"<b>{m} м.</b>"
     return reminder_times_text
+
+LOCALE_LOCK = threading.Lock()
+
+@contextmanager
+def set_time_locale(name: str):
+    with LOCALE_LOCK:
+        saved = locale.setlocale(locale.LC_TIME)
+        try:
+            yield locale.setlocale(locale.LC_TIME, name)
+        finally:
+            locale.setlocale(locale.LC_TIME, saved)

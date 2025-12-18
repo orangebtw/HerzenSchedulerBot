@@ -1,7 +1,6 @@
-from aiogram import Router, Dispatcher, types, F
+from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
-from aiogram.enums.parse_mode import ParseMode
 from aiogram.filters import StateFilter
 
 import utils
@@ -16,7 +15,7 @@ async def handle_configure_group(message: types.Message, state: FSMContext):
         
     keyboard.row(keyboards.CANCEL_BUTTON)
     
-    await message.reply(f"<b>Выберите факультет</b>:\n\n{msg_text}", reply_markup=keyboard.as_markup(), parse_mode=ParseMode.HTML)
+    await message.reply(f"<b>Выберите факультет</b>:\n\n{msg_text}", reply_markup=keyboard.as_markup())
     await state.set_state(RegisterUserState.Faculty)
 
 
@@ -31,8 +30,7 @@ async def handle_ask_faculty(call: types.CallbackQuery, callback_data: utils.Num
     keyboard.row(keyboards.CANCEL_BUTTON)
 
     await call.message.edit_text(f"Факультет: <b>{faculty.name}</b>\n\n<b>Выберите форму обучения</b>:\n\n{msg_text}",
-                                 reply_markup=keyboard.as_markup(),
-                                 parse_mode=ParseMode.HTML)
+                                 reply_markup=keyboard.as_markup())
     await state.set_state(RegisterUserState.Form)
 
 
@@ -49,8 +47,7 @@ async def handle_ask_form(call: types.CallbackQuery, callback_data: utils.NumCal
     keyboard.row(keyboards.CANCEL_BUTTON)
 
     await call.message.edit_text(f"Форма обучения: <b>{form.name}</b>\n\n<b>Выберите ступень обучения</b>:\n\n{msg_text}",
-                                 reply_markup=keyboard.as_markup(),
-                                 parse_mode=ParseMode.HTML)
+                                 reply_markup=keyboard.as_markup())
     await state.set_state(RegisterUserState.Stage)
 
 
@@ -68,8 +65,7 @@ async def handle_ask_stage(call: types.CallbackQuery, callback_data: utils.NumCa
     keyboard.row(keyboards.CANCEL_BUTTON)
 
     await call.message.edit_text(f"Ступень обучения: <b>{stage.name}</b>\n\n<b>Выберите курс</b>:\n\n{msg_text}",
-                                 reply_markup=keyboard.as_markup(),
-                                 parse_mode=ParseMode.HTML)
+                                 reply_markup=keyboard.as_markup())
     await state.set_state(RegisterUserState.Course)
 
 
@@ -88,8 +84,7 @@ async def handle_ask_course(call: types.CallbackQuery, callback_data: utils.NumC
     keyboard.row(keyboards.CANCEL_BUTTON)
 
     await call.message.edit_text(f"Курс: <b>{course.name}</b>\n\n<b>Выберите группу</b>:\n\n{msg_text}",
-                                 reply_markup=keyboard.as_markup(),
-                                 parse_mode=ParseMode.HTML)
+                                 reply_markup=keyboard.as_markup())
     await state.set_state(RegisterUserState.Group)
 
 
@@ -118,8 +113,7 @@ async def handle_ask_group(call: types.CallbackQuery, callback_data: utils.NumCa
     
     await call.message.edit_text(f"Группа: <b>{group.name}</b>\n"
                                  "Выберите номер <b>подгруппы</b>, если такая есть. Если нет, нажмите кнопку <b>\"Без подгруппы\"</b>.",
-                                 reply_markup=builder.as_markup(),
-                                 parse_mode=ParseMode.HTML)
+                                 reply_markup=builder.as_markup())
 
     await state.set_state(RegisterUserState.SubGroup)
     
@@ -135,7 +129,7 @@ async def handle_ask_subgroup(call: types.CallbackQuery, callback_data: utils.Nu
     
     database.add_user(models.User(user_id, models.UserGroupWithName(group_name, group_id, subgroup)))
     
-    await call.message.edit_text("<b>Отлично, всё готово!</b> 🎉", parse_mode=ParseMode.HTML)
+    await call.message.edit_text("<b>Отлично, всё готово!</b> 🎉")
     
     await call.message.answer("Теперь я могу привязывать твои заметки к расписанию.\n"
                               "Просто напиши мне что-нибудь во время пары — я пойму, к какому предмету это относится.", reply_markup=keyboards.MAIN_KEYBOARD)
