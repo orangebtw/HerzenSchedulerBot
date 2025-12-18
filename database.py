@@ -2,57 +2,77 @@ import parse
 import threading
 import models
 
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Generator
 
-GROUPS: list[parse.ScheduleFaculty] = []
-GROUPS_LOCK = threading.Lock()
+from contextlib import contextmanager
 
-SCHEDULES: dict[models.UserGroup, list[parse.ScheduleSubject]] = {}
-SCHEDULES_LOCK = threading.Lock()
-
-USERS: set[models.User] = set()
-USERS_LOCK = threading.Lock()
-
-NOTES: set[models.UserNote] = set()
-NOTES_LOCK = threading.Lock()
-
-def update_groups():
-    global GROUPS
-    with GROUPS_LOCK:
-        GROUPS = parse.parse_groups()
-
-def clear_subjects():
-    global SCHEDULES
-    with SCHEDULES_LOCK:
-        SCHEDULES.clear()
-
-def get_subjects(group_id: str, subgroup: int | None = None) -> list[parse.ScheduleSubject]:
-    global SCHEDULES
-    
-    g = models.UserGroup(group_id, subgroup)
-    
-    with SCHEDULES_LOCK:
-        if g in SCHEDULES: return SCHEDULES[g]
-        schedules = parse.parse_schedule(group_id, subgroup)
-        SCHEDULES[g] = schedules
-        return schedules
-
-def add_user(user: models.User):
-    with USERS_LOCK:
-        USERS.add(user)
+class GroupsDatabase:
+    def __init__(self):
+        self.groups: list[parse.ScheduleFaculty] = []
+        self.lock = threading.Lock()
         
-def add_note(note: models.UserNote):
-    with NOTES_LOCK:
-        NOTES.add(note)
+    def fetch_groups(self):
+        with self.lock:
+            self.groups = parse.parse_groups()
+        
+    @contextmanager    
+    def get_groups(self):
+        self.lock.acquire()
+        try:
+            yield self.groups
+        finally:
+            self.lock.release()
+            
+class SchedulesDatabase:
+    def __init__(self):
+        self.schedules: dict[models.UserGroup, list[parse.ScheduleSubject]] = {}
+        self.lock = threading.Lock()
+        
+    def clear_subjects(self):
+        with self.lock:
+            self.schedules.clear()
+        
+    @contextmanager    
+    def get_subjects(self, group_id: str, subgroup: int | None = None):
+        self.lock.acquire()
+        try:
+            g = models.UserGroup(group_id, subgroup)
+            if g not in self.schedules:
+                self.schedules[g] = parse.parse_schedule(group_id, subgroup)
+            yield self.schedules[g]
+        finally:
+            self.lock.release()
 
-def get_user_by_id(id: models.UserId) -> Optional[models.User]:
-    with USERS_LOCK:
-        return next((user for user in USERS if user.id == id), None)
-
-def get_notes_by_user_id(user_id: models.UserId) -> Iterable[models.UserNote]:
-    with NOTES_LOCK:
-        return filter(lambda note: note.user_id == user_id, NOTES)
+class UsersDatabase:
+    def __init__(self):
+        self.users: set[models.User] = set()
+        self.lock = threading.Lock()
+        
+    def add_user(self, user: models.User):
+        with self.lock:
+            self.users.add(user)
+        
+    @contextmanager
+    def get_user_by_id(self, id: models.UserId) -> Generator[Optional[models.User]]:
+        self.lock.acquire()
+        try:
+            yield next((user for user in self.users if user.id == id), None)
+        finally:
+            self.lock.release()
     
-def user_exists(user_id: models.UserId) -> bool:
-    with USERS_LOCK:
-        return any((True for user in USERS if user.id == user_id))
+    def user_exists(self, user_id: models.UserId) -> bool:
+        with self.lock:
+            return any((True for user in self.users if user.id == user_id))
+
+class NotesDatabase:
+    def __init__(self):
+        self.notes: set[models.UserNote] = set()
+        self.lock = threading.Lock()
+    
+    def add_note(self, note: models.UserNote):
+        with self.lock:
+            self.notes.add(note)
+
+    def get_notes_by_user_id(self, user_id: models.UserId) -> Iterable[models.UserNote]:
+        with self.lock:
+            return filter(lambda note: note.user_id == user_id, self.notes)

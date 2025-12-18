@@ -1,3 +1,4 @@
+import asyncio
 from aiogram import Router, types, F, Bot
 from aiogram.fsm.context import FSMContext
 from aiogram.filters import CommandStart, StateFilter
@@ -14,19 +15,17 @@ from aiogram_dialog.widgets.kbd.button import Button
 from aiogram_dialog.widgets.kbd.calendar_kbd import Calendar, CalendarConfig, CalendarScope, CalendarScopeView, CalendarDaysView, CalendarMonthView, CalendarYearsView
 from aiogram_dialog.widgets.text import Const, Format, Text
 
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date, time
 
 import constants
 import keyboards
 import database
 import utils
 import parse
-
+import models
 from states import MainState, NoteCreationState
-
 from utils import NumCallbackData
 
-SELECT_RECENT_SUBJECT = 'select-recent-subject'
 
 class DialogState(StatesGroup):
     NoSubjectCurrently = State()
@@ -77,77 +76,102 @@ async def handle_cancel(call: types.CallbackQuery, state: FSMContext):
     await call.message.delete_reply_markup()
 
 
-async def check_user_exists(message: types.Message) -> bool:
+async def check_user_exists(message: types.Message, users_database: database.UsersDatabase) -> bool:
     assert(message.from_user is not None)
     
-    if not database.user_exists(message.from_user.id):
+    if not users_database.user_exists(message.from_user.id):
         await message.answer("Я тебя не знаю. Пожалуйста, напиши /start и пройди регистрацию.")
         return False
     return True
 
-async def handle_new_reminder(message: types.Message, bot: Bot, state: FSMContext, dialog_manager: DialogManager):
-    if not await check_user_exists(message): return
+async def handle_new_reminder(
+    message: types.Message,
+    bot: Bot,
+    state: FSMContext,
+    dialog_manager: DialogManager,
+    schedules_database: database.SchedulesDatabase,
+    users_database: database.UsersDatabase,
+    notes_database: database.NotesDatabase
+):
+    if not await check_user_exists(message, users_database=users_database):
+        return
     
-    user = database.get_user_by_id(message.from_user.id)
-    assert(user is not None)
+    with users_database.get_user_by_id(message.from_user.id) as user:
+        assert(user is not None)
     
-    async with ChatActionSender(bot=bot, chat_id=message.chat.id, action=ChatAction.TYPING):
-        date = message.date.astimezone(utils.DEFAULT_TIMEZONE)
-        subjects = database.get_subjects(user.group.id, user.group.subgroup)
-    
-        found_subject: parse.ScheduleSubject | None = None
-    
-        for subject in subjects:
-            start = subject.time_start - timedelta(minutes=3)
-            end = subject.time_end + timedelta(minutes=7)
+        async with ChatActionSender(bot=bot, chat_id=message.chat.id, action=ChatAction.TYPING):
+            date = message.date.astimezone(utils.DEFAULT_TIMEZONE)
+            found_subject: parse.ScheduleSubject | None = None
+            last_subject: parse.ScheduleSubject = None
             
-            if start <= date <= end:
-                found_subject = subject
-                break
-        
-        if found_subject is None:
-            last_subject = subjects[-1]
+            with schedules_database.get_subjects(user.group.id, user.group.subgroup) as subjects:
+                last_subject = subjects[-1]
+                
+                for subject in subjects:
+                    start = subject.time_start - timedelta(minutes=3)
+                    end = subject.time_end + timedelta(minutes=7)
+                    
+                    if start <= date <= end:
+                        found_subject = subject
+                        break
+                
+            if found_subject is None:
+                await dialog_manager.start(DialogState.NoSubjectCurrently,
+                                        mode=StartMode.RESET_STACK,
+                                        data={
+                                            'subject': last_subject,
+                                            'note_text': message.text,
+                                            'user_id': user.id,
+                                            'notes_database': notes_database})
+            else:
+                await message.reply(f"Сейчас идёт пара \"<b>{found_subject.name}</b>\", верно?",
+                                    reply_markup=keyboards.YES_OR_NO_KEYBOARD)
+                await state.update_data(subject=found_subject)
+                await state.set_state(NoteCreationState.IsCurrentSubjectCorrect)
 
-            await dialog_manager.start(DialogState.NoSubjectCurrently,
-                                       mode=StartMode.RESET_STACK,
-                                       data={
-                                           'subject': last_subject,
-                                           'note_text': message.text})
-        else:
-            await message.reply(f"Сейчас идёт пара \"<b>{found_subject.name}</b>\", верно?",
-                                reply_markup=keyboards.YES_OR_NO_KEYBOARD)
-            await state.update_data(subject=found_subject)
-            await state.set_state(NoteCreationState.IsCurrentSubjectCorrect)
 
-
-async def handle_due_date_selected(call: types.CallbackQuery, widget, manager: DialogManager, selected_date: date):
+async def handle_due_date_selected(
+    call: types.CallbackQuery,
+    widget,
+    manager: DialogManager,
+    selected_date: date,
+    **kwargs
+):
     subject: parse.ScheduleSubject = manager.start_data['subject']
     note_text: str = manager.start_data['note_text']
+    user_id: int = manager.start_data['user_id']
+    notes_databse: database.NotesDatabase = manager.start_data['notes_database']
     
     with utils.set_time_locale('ru_RU.UTF-8'):
         date_text: str = selected_date.strftime("%d %b %Y")
 
     await call.message.edit_text(f"✅ Сохранено задание по предмету <b>{subject.name}</b>: \"{note_text}\" к <b>{date_text}</b>.")
     
+    notes_databse.add_note(models.UserNote(user_id, subject.name, note_text, datetime.combine(selected_date, time(hour=23, minute=59), tzinfo=utils.DEFAULT_TIMEZONE)))
+    
     await manager.done()
 
-async def handle_subject_not_correct(call: types.CallbackQuery, state: FSMContext):
+async def handle_subject_not_correct(
+    call: types.CallbackQuery,
+    state: FSMContext,
+    schedules_database: database.SchedulesDatabase,
+    users_database: database.UsersDatabase
+):
     await call.answer()
     
-    user = database.get_user_by_id(call.from_user.id)
-    assert(user is not None)
-    
-    subjects = database.get_subjects(user.group.id, user.group.subgroup)
     subjects_text = ""
-    
     builder = InlineKeyboardBuilder()
     
-    for i, subject in enumerate(subjects, 1):
-        subjects_text += f"{i}. <b>{subject.name}</b>"
-        builder.add(types.InlineKeyboardButton(text=str(i), callback_data=NumCallbackData(num=i).pack()))
+    with users_database.get_user_by_id(call.from_user.id) as user:
+        assert(user is not None)
+    
+        with schedules_database.get_subjects(user.group.id, user.group.subgroup) as subjects:
+            for i, subject in enumerate(subjects, 1):
+                subjects_text += f"{i}. <b>{subject.name}</b>"
+                builder.add(types.InlineKeyboardButton(text=str(i), callback_data=NumCallbackData(num=i).pack()))
     
     await call.message.edit_text("<b>Нажмите на кнопку ниже с цифрой, соответствующей нужному предмету:</b>\n\n",
-                                 reply_markup=builder.as_markup())
+                                reply_markup=builder.as_markup())
     
     await state.set_state(NoteCreationState.AskCustomSubject)
 
@@ -156,13 +180,15 @@ async def handle_create_note(call: types.CallbackQuery, state: FSMContext):
     pass
 
 
-async def handle_settings(message: types.Message, state: FSMContext):
-    if not await check_user_exists(message): return
+async def handle_settings(message: types.Message, state: FSMContext, users_database: database.UsersDatabase):
+    if not await check_user_exists(message, users_database=users_database):
+        return
     
     assert(message.from_user is not None)
     
-    user = database.get_user_by_id(message.from_user.id)
-    assert(user is not None)
+    with users_database.get_user_by_id(message.from_user.id) as user:
+        assert(user is not None)
+        reminder_times_text = utils.user_reminder_times_to_text(user)
     
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(text="1", callback_data=NumCallbackData(num=1).pack()))
@@ -172,8 +198,6 @@ async def handle_settings(message: types.Message, state: FSMContext):
     builder.add(types.InlineKeyboardButton(text="5", callback_data=NumCallbackData(num=5).pack()))
     builder.add(types.InlineKeyboardButton(text="6", callback_data=NumCallbackData(num=6).pack()))
     builder.row(keyboards.CANCEL_BUTTON)
-    
-    reminder_times_text = utils.user_reminder_times_to_text(user)
     
     await message.answer("<b>Введите номер пункта, который хотите изменить.</b>\n"
                          f"1. 🎓  Группа: {user.group.name}\n"

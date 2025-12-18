@@ -12,20 +12,18 @@ import database
 import constants
 
 bot = Bot(token=constants.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
-dp = Dispatcher()
 
-async def update_groups_and_clear_schedules(time: str):
-    global SCHEDULES
+async def update_groups_and_clear_schedules(time: str, groups_database: database.GroupsDatabase, schedules_database: database.SchedulesDatabase):
     while True:
-        database.update_groups()
-        database.clear_subjects()
+        groups_database.fetch_groups()
+        schedules_database.clear_subjects()
         await asyncio.sleep(utils.seconds_before_time(time))
 
-async def on_startup():
+async def on_startup(groups_database: database.GroupsDatabase, schedules_database: database.SchedulesDatabase):
     await bot.delete_webhook(drop_pending_updates=True)
     
     loop = asyncio.get_event_loop()
-    loop.create_task(update_groups_and_clear_schedules('00:00'))
+    loop.create_task(update_groups_and_clear_schedules('00:00', groups_database=groups_database, schedules_database=schedules_database))
     
 async def main():
     registration_router = Router()
@@ -37,6 +35,13 @@ async def main():
     configure_user_handler.register(configure_user_router)
     configure_reminders_handler.register(configure_reminders_router)
     base_handler.register(base_router)
+    
+    dp = Dispatcher(
+        groups_database=database.GroupsDatabase(),
+        schedules_database=database.SchedulesDatabase(),
+        users_database=database.UsersDatabase(),
+        notes_database=database.NotesDatabase()
+    )
     
     dp.startup.register(on_startup)
     dp.include_router(registration_router)

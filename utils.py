@@ -80,3 +80,7 @@ def set_time_locale(name: str):
             yield locale.setlocale(locale.LC_TIME, name)
         finally:
             locale.setlocale(locale.LC_TIME, saved)
+            
+            
+async def schedule_reminder(until: datetime):
+    pass

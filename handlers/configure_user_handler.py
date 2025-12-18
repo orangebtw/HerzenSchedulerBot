@@ -88,7 +88,7 @@ async def handle_ask_course(call: types.CallbackQuery, callback_data: utils.NumC
     await state.set_state(ConfigureUserState.Group)
 
 
-async def handle_ask_group(call: types.CallbackQuery, callback_data: utils.NumCallbackData, state: FSMContext):
+async def handle_ask_group(call: types.CallbackQuery, callback_data: utils.NumCallbackData, state: FSMContext, groups_database: database.GroupsDatabase):
     await call.answer()
     
     faculty: int = await state.get_value("faculty")
@@ -96,8 +96,8 @@ async def handle_ask_group(call: types.CallbackQuery, callback_data: utils.NumCa
     stage: int = await state.get_value("stage")
     course: int = await state.get_value("course")
     
-    with database.GROUPS_LOCK:
-        group = database.GROUPS[faculty].forms[form].stages[stage].courses[course].groups[callback_data.num]
+    with groups_database.get_groups() as groups:
+        group = groups[faculty].forms[form].stages[stage].courses[course].groups[callback_data.num]
     
     await state.update_data(group_id=group.id)
     await state.update_data(group_name=group.name)
@@ -118,7 +118,7 @@ async def handle_ask_group(call: types.CallbackQuery, callback_data: utils.NumCa
     await state.set_state(ConfigureUserState.SubGroup)
     
 
-async def handle_ask_subgroup(call: types.CallbackQuery, callback_data: utils.NumCallbackData, state: FSMContext):
+async def handle_ask_subgroup(call: types.CallbackQuery, callback_data: utils.NumCallbackData, state: FSMContext, users_database: database.UsersDatabase):
     await call.answer()
     
     data = await state.get_data()
@@ -127,10 +127,9 @@ async def handle_ask_subgroup(call: types.CallbackQuery, callback_data: utils.Nu
     subgroup = callback_data.num if callback_data.num > 0 else None
     user_id = call.from_user.id
     
-    user = database.get_user_by_id(user_id)
-    assert(user is not None)
-    
-    user.group = models.UserGroupWithName(group_name, group_id, subgroup)
+    with users_database.get_user_by_id(user_id) as user:
+        assert(user is not None)
+        user.group = models.UserGroupWithName(group_name, group_id, subgroup)
     
     await call.message.edit_text("✅ <b>Группа успешна обновлена!</b>")
     

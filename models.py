@@ -1,8 +1,8 @@
 from typing import Optional
 from dataclasses import dataclass, field
-from uuid import UUID
 from datetime import datetime
 from datetime import timedelta
+import uuid
 
 type UserId = int
 
@@ -32,11 +32,12 @@ class User:
     
 @dataclass
 class UserNote:
-    id: UUID = field(default_factory=UUID, init=False)
+    id: uuid.UUID = field(default_factory=uuid.uuid4, init=False)
     user_id: UserId
     subject_id: str
     text: str
     time: datetime
+    done: bool = field(default=False, init=False)
     
     def __hash__(self):
         return hash(self.id)

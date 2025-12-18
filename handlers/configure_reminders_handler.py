@@ -42,7 +42,7 @@ async def handle_ask_time(call: types.CallbackQuery, callback_data: utils.NumCal
     await state.set_state(ConfigureReminderState.GetTime)
 
 
-async def handle_get_time(message: types.Message, state: FSMContext):
+async def handle_get_time(message: types.Message, state: FSMContext, users_database: database.UsersDatabase):
     total = await state.get_value("total")
     current = await state.get_value("current", 1)
         
@@ -82,16 +82,15 @@ async def handle_get_time(message: types.Message, state: FSMContext):
             await message.answer(f"⏰ Укажите количесто <b>часов</b> от {range_start} до {range_end} включительно, за которое необходимо напоминать в {current}-й раз.",
                                 reply_markup=builder.as_markup())
     else:
-        user = database.get_user_by_id(message.from_user.id)
-        assert(user is not None)
+        with users_database.get_user_by_id(message.from_user.id) as user:
+            assert(user is not None)
+            reminder_times = list(user.reminder_times)
         
-        reminder_times = list(user.reminder_times)
-        
-        for i in range(0, len(values) - 1):
-            reminder_times[i] = models.UserReminderTime(timedelta(hours=values[i]))
-        reminder_times[-1] = models.UserReminderTime(timedelta(minutes=values[-1]))
-        
-        user.reminder_times = tuple(reminder_times)
+            for i in range(0, len(values) - 1):
+                reminder_times[i] = models.UserReminderTime(timedelta(hours=values[i]))
+            reminder_times[-1] = models.UserReminderTime(timedelta(minutes=values[-1]))
+    
+            user.reminder_times = tuple(reminder_times)
         
         await message.answer("✅ <b>Напоминания о дедлайнах успешно обновлены!</b>")
         
