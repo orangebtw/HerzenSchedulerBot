@@ -7,9 +7,15 @@ from datetime import timedelta
 type UserId = int
 
 @dataclass(frozen=True)
+class UserGroupWithName:
+    name: str
+    id: str
+    subgroup: int | None = None
+
+@dataclass(frozen=True)
 class UserGroup:
     id: str
-    name: str
+    subgroup: int | None = None
 
 @dataclass(frozen=True)
 class UserReminderTime:
@@ -18,8 +24,7 @@ class UserReminderTime:
 @dataclass
 class User:
     id: UserId
-    group: UserGroup
-    subgroup: int
+    group: UserGroupWithName
     reminder_times: tuple[UserReminderTime, Optional[UserReminderTime], Optional[UserReminderTime]] = field(default=(UserReminderTime(timedelta(hours=24)), UserReminderTime(timedelta(hours=3)), None))
     
     def __hash__(self):

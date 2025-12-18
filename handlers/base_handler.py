@@ -4,10 +4,13 @@ from aiogram.filters import CommandStart, StateFilter
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.enums.parse_mode import ParseMode
 
+from datetime import datetime
+
 import constants
 import keyboards
 import database
 import utils
+import parse
 
 from states import MainState
 
@@ -28,6 +31,8 @@ async def handle_cancel(call: types.CallbackQuery, state: FSMContext):
 
 
 async def check_user_exists(message: types.Message) -> bool:
+    assert(message.from_user is not None)
+    
     if not database.user_exists(message.from_user.id):
         await message.answer("Я тебя не знаю. Пожалуйста, напиши /start и пройди регистрацию.")
         return False
@@ -36,13 +41,33 @@ async def check_user_exists(message: types.Message) -> bool:
 async def handle_new_note(message: types.Message):
     if not await check_user_exists(message): return
     
-    print("NEW NOTE")
-
+    user = database.get_user_by_id(message.from_user.id)
+    assert(user is not None)
+    
+    date = message.date.astimezone(utils.DEFAULT_TIMEZONE)
+    
+    subjects = database.get_subjects(user.group.id, user.group.subgroup)
+    
+    found_subject: parse.ScheduleSubject | None = None
+    
+    for subject in subjects:
+        if subject.time_start <= date <= subject.time_end:
+            found_subject = subject
+            break
+        
+    if found_subject is None:
+        await message.reply("Сейчас не идёт никакой пары")
+    else:
+        await message.reply(f"Сейчас идёт пара \"<b>{found_subject.name}</b>\", верно?",
+                            parse_mode=ParseMode.HTML)
 
 async def handle_settings(message: types.Message, state: FSMContext):
     if not await check_user_exists(message): return
     
+    assert(message.from_user is not None)
+    
     user = database.get_user_by_id(message.from_user.id)
+    assert(user is not None)
     
     builder = InlineKeyboardBuilder()
     builder.add(types.InlineKeyboardButton(text="1", callback_data=NumCallbackData(num=1).pack()))

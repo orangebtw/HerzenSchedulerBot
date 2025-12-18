@@ -1,8 +1,10 @@
 import requests
 import bs4
 from dataclasses import dataclass
-from pathlib import Path
+from datetime import datetime, time
 import re
+
+import utils
 
 HERZEN_URL = "https://old-guide.herzen.spb.ru"
 GROUPS_URL = f"{HERZEN_URL}/static/schedule.php"
@@ -39,7 +41,8 @@ class ScheduleFaculty:
 
 @dataclass(frozen=True)
 class ScheduleSubject:
-    time: str
+    time_start: time
+    time_end: time
     mod: str
     name: str
     type: str
@@ -97,7 +100,7 @@ def parse_groups() -> list[ScheduleFaculty]:
         index += 1
     return schedule_ids
 
-def parse_schedule(group_id, subgroup_id=None) -> list[ScheduleSubject]:
+def parse_schedule(group_id: str, subgroup_id: int | None = None) -> list[ScheduleSubject]:
     res = requests.get(f"{SCHEDULE_DATA_URL}?id_group={group_id}", {
         'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36"
     })
@@ -120,13 +123,13 @@ def parse_schedule(group_id, subgroup_id=None) -> list[ScheduleSubject]:
     day_name = ''
     for class_number in range(len(courses_column)):
 
-        class_time = courses_column[class_number].find('th').text
+        class_time = str(courses_column[class_number].find('th').text)
 
         if courses_column[class_number].find('th', {'class': 'dayname'}):
             day_name = courses_column[class_number].find('th', {'class': 'dayname'}).text
             continue
 
-        course = courses_column[class_number].findAll('td')
+        course = courses_column[class_number].find_all('td')
 
         if (len(course) > 1) and subgroup_id and (0 < subgroup_id <= len(course)):  # If multiple classes at the same time
             course = course[subgroup_id - 1]
@@ -136,7 +139,7 @@ def parse_schedule(group_id, subgroup_id=None) -> list[ScheduleSubject]:
         if not course.find('strong'):  # If class not found
             continue
         
-        class_names = course.findAll('strong')
+        class_names = course.find_all('strong')
         for class_name in class_names:
             class_type = class_name.next.next
 
@@ -167,11 +170,26 @@ def parse_schedule(group_id, subgroup_id=None) -> list[ScheduleSubject]:
 
                 class_teacher = class_teacher.text
                 class_room = str(class_room.text).strip(", \n")
+                
+            date_str = day_name.split(',')[0].strip()
+            date = datetime.strptime(date_str, "%d.%m.%Y")
+            
+            time_start_str, time_end_str = str(class_time).split('—')
+            
+            time_start_h, time_start_m = time_start_str.strip().split(':')
+            time_end_h, time_end_m = time_end_str.strip().split(':')
+            
+            time_start = time(hour=int(time_start_h), minute=int(time_start_m))
+            time_end = time(hour=int(time_end_h), minute=int(time_end_m))
+            
+            date_start = datetime.combine(date, time_start, tzinfo=utils.DEFAULT_TIMEZONE)
+            date_end = datetime.combine(date, time_end, tzinfo=utils.DEFAULT_TIMEZONE)
 
             # if day_name not in schedule_courses.keys():
             #     schedule_courses[day_name] = []
             schedule_courses.append(ScheduleSubject(
-                time=class_time,
+                time_start=date_start,
+                time_end=date_end,
                 mod=class_mod,
                 name=class_name.text.strip(),
                 type=class_type.strip(),
@@ -183,6 +201,8 @@ def parse_schedule(group_id, subgroup_id=None) -> list[ScheduleSubject]:
 
 if __name__ == "__main__":
     schedules = parse_groups()
+    subjects = parse_schedule(schedules[0].forms[0].stages[0].courses[0].groups[0].id)
+    print(subjects[0])
     # for g in groups:
     #     print(g)
 

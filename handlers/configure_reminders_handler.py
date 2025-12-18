@@ -64,7 +64,7 @@ async def handle_get_time(message: types.Message, state: FSMContext):
     values.append(value)
     
     range_start -= 1
-    range_end = value
+    range_end = value - 1
     current += 1
     
     if current <= total:

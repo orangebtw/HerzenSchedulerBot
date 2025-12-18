@@ -4,7 +4,10 @@ import models
 
 from typing import Iterable, Optional
 
-SCHEDULES: list[parse.ScheduleFaculty] = []
+GROUPS: list[parse.ScheduleFaculty] = []
+GROUPS_LOCK = threading.Lock()
+
+SCHEDULES: dict[models.UserGroup, list[parse.ScheduleSubject]] = {}
 SCHEDULES_LOCK = threading.Lock()
 
 USERS: set[models.User] = set()
@@ -14,9 +17,25 @@ NOTES: set[models.UserNote] = set()
 NOTES_LOCK = threading.Lock()
 
 def update_groups():
+    global GROUPS
+    with GROUPS_LOCK:
+        GROUPS = parse.parse_groups()
+
+def clear_subjects():
     global SCHEDULES
     with SCHEDULES_LOCK:
-        SCHEDULES = parse.parse_groups()
+        SCHEDULES.clear()
+
+def get_subjects(group_id: str, subgroup: int | None = None) -> list[parse.ScheduleSubject]:
+    global SCHEDULES
+    
+    g = models.UserGroup(group_id, subgroup)
+    
+    with SCHEDULES_LOCK:
+        if g in SCHEDULES: return SCHEDULES[g]
+        schedules = parse.parse_schedule(group_id, subgroup)
+        SCHEDULES[g] = schedules
+        return schedules
 
 def add_user(user: models.User):
     with USERS_LOCK:

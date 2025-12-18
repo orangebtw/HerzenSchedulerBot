@@ -10,15 +10,18 @@ import constants
 bot = Bot(token=constants.BOT_TOKEN)
 dp = Dispatcher()
 
-async def update_groups(time: str):
+async def update_groups_and_clear_schedules(time: str):
     global SCHEDULES
     while True:
         database.update_groups()
+        database.clear_subjects()
         await asyncio.sleep(utils.seconds_before_time(time))
 
 async def on_startup():
+    await bot.delete_webhook(drop_pending_updates=True)
+    
     loop = asyncio.get_event_loop()
-    loop.create_task(update_groups('00:00'))
+    loop.create_task(update_groups_and_clear_schedules('00:00'))
     
 async def main():
     registration_router = Router()

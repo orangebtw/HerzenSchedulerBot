@@ -7,13 +7,13 @@ from zoneinfo import ZoneInfo
 
 import models
 
-DEFAULT_TIMEZONE = "Europe/Moscow"
+DEFAULT_TIMEZONE = ZoneInfo("Europe/Moscow")
 
 class NumCallbackData(CallbackData, prefix="data-int"):
     num: int
 
 def seconds_before_time(t: str) -> float:
-    now = datetime.now(tz=ZoneInfo(DEFAULT_TIMEZONE))
+    now = datetime.now(tz=DEFAULT_TIMEZONE)
     wait_for = time.fromisoformat(t)
     target = datetime.combine(now, wait_for, now.tzinfo)
     if now >= target:
@@ -50,14 +50,14 @@ def user_reminder_times_to_text(user: models.User) -> str:
         
         if secs >= 86400:
             d = int(secs / 86400)
-            secs -= secs * 86400
+            secs -= d * 86400
             reminder_times_text += f"<b>{d} д.</b>"
             if secs > 0:
                 reminder_times_text += " "
             
         if secs >= 3600:
             h = int(secs / 3600)
-            secs -= secs * 3600
+            secs -= h * 3600
             reminder_times_text += f"<b>{h} ч.</b>"
             if secs > 0:
                 reminder_times_text += " "

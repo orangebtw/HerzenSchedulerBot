@@ -11,8 +11,10 @@ import database
 from states import ConfigureUserState, MainState
 
 async def handle_configure_group(call: types.CallbackQuery, state: FSMContext):
-    with database.SCHEDULES_LOCK:
-        msg_text, keyboard = utils.generate_choice_message(database.SCHEDULES)
+    with database.GROUPS_LOCK:
+        msg_text, keyboard = utils.generate_choice_message(database.GROUPS)
+        
+    keyboard.row(keyboards.CANCEL_BUTTON)
     
     await call.message.edit_text(f"<b>Выберите факультет</b>:\n\n{msg_text}", reply_markup=keyboard.as_markup(), parse_mode=ParseMode.HTML)
     await state.set_state(ConfigureUserState.Faculty)
@@ -22,8 +24,8 @@ async def handle_ask_faculty(call: types.CallbackQuery, callback_data: utils.Num
     await call.answer()
     await state.update_data(faculty=callback_data.num)
     
-    with database.SCHEDULES_LOCK:
-        faculty = database.SCHEDULES[callback_data.num]
+    with database.GROUPS_LOCK:
+        faculty = database.GROUPS[callback_data.num]
         msg_text, keyboard = utils.generate_choice_message(faculty.forms)
     
     keyboard.row(keyboards.CANCEL_BUTTON)
@@ -40,8 +42,8 @@ async def handle_ask_form(call: types.CallbackQuery, callback_data: utils.NumCal
     
     faculty: int = await state.get_value("faculty")
     
-    with database.SCHEDULES_LOCK:
-        form = database.SCHEDULES[faculty].forms[callback_data.num]
+    with database.GROUPS_LOCK:
+        form = database.GROUPS[faculty].forms[callback_data.num]
         msg_text, keyboard = utils.generate_choice_message(form.stages)
     
     keyboard.row(keyboards.CANCEL_BUTTON)
@@ -59,8 +61,8 @@ async def handle_ask_stage(call: types.CallbackQuery, callback_data: utils.NumCa
     faculty: int = await state.get_value("faculty")
     form: int = await state.get_value("form")
     
-    with database.SCHEDULES_LOCK:
-        stage = database.SCHEDULES[faculty].forms[form].stages[callback_data.num]
+    with database.GROUPS_LOCK:
+        stage = database.GROUPS[faculty].forms[form].stages[callback_data.num]
         msg_text, keyboard = utils.generate_choice_message(stage.courses)
     
     keyboard.row(keyboards.CANCEL_BUTTON)
@@ -79,8 +81,8 @@ async def handle_ask_course(call: types.CallbackQuery, callback_data: utils.NumC
     form: int = await state.get_value("form")
     stage: int = await state.get_value("stage")
     
-    with database.SCHEDULES_LOCK:
-        course = database.SCHEDULES[faculty].forms[form].stages[stage].courses[callback_data.num]
+    with database.GROUPS_LOCK:
+        course = database.GROUPS[faculty].forms[form].stages[stage].courses[callback_data.num]
         msg_text, keyboard = utils.generate_choice_message(course.groups)
 
     keyboard.row(keyboards.CANCEL_BUTTON)
@@ -99,8 +101,8 @@ async def handle_ask_group(call: types.CallbackQuery, callback_data: utils.NumCa
     stage: int = await state.get_value("stage")
     course: int = await state.get_value("course")
     
-    with database.SCHEDULES_LOCK:
-        group = database.SCHEDULES[faculty].forms[form].stages[stage].courses[course].groups[callback_data.num]
+    with database.GROUPS_LOCK:
+        group = database.GROUPS[faculty].forms[form].stages[stage].courses[course].groups[callback_data.num]
     
     await state.update_data(group_id=group.id)
     await state.update_data(group_name=group.name)
@@ -128,14 +130,13 @@ async def handle_ask_subgroup(call: types.CallbackQuery, callback_data: utils.Nu
     data = await state.get_data()
     group_id = data['group_id']
     group_name = data['group_name']
-    subgroup = callback_data.num
+    subgroup = callback_data.num if callback_data.num > 0 else None
     user_id = call.from_user.id
     
     user = database.get_user_by_id(user_id)
     assert(user is not None)
     
-    user.group = models.UserGroup(group_id, group_name)
-    user.subgroup = subgroup
+    user.group = models.UserGroupWithName(group_name, group_id, subgroup)
     
     await call.message.edit_text("✅ <b>Группа успешна обновлена!</b>", parse_mode=ParseMode.HTML)
     
