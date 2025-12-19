@@ -100,7 +100,7 @@ def parse_groups() -> list[ScheduleFaculty]:
         index += 1
     return schedule_ids
 
-def parse_schedule(group_id: str, subgroup_id: int | None = None) -> list[ScheduleSubject]:
+def parse_schedule(group_id: str, subgroup_id: int | None = None) -> list[ScheduleSubject] | None:
     res = requests.get(f"{SCHEDULE_DATA_URL}?id_group={group_id}", {
         'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36"
     })
@@ -185,8 +185,6 @@ def parse_schedule(group_id: str, subgroup_id: int | None = None) -> list[Schedu
             date_start = datetime.combine(date, time_start, tzinfo=utils.DEFAULT_TIMEZONE)
             date_end = datetime.combine(date, time_end, tzinfo=utils.DEFAULT_TIMEZONE)
 
-            # if day_name not in schedule_courses.keys():
-            #     schedule_courses[day_name] = []
             schedule_courses.append(ScheduleSubject(
                 time_start=date_start,
                 time_end=date_end,

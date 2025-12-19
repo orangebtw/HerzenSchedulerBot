@@ -103,12 +103,11 @@ async def handle_ask_group(call: types.CallbackQuery, callback_data: utils.NumCa
     await state.update_data(group_name=group.name)
     
     builder = InlineKeyboardBuilder()
-    builder.row(types.InlineKeyboardButton(text='Без подгруппы', callback_data=utils.NumCallbackData(num=0).pack()))
     builder.row(
         types.InlineKeyboardButton(text='1', callback_data=utils.NumCallbackData(num=1).pack()),
         types.InlineKeyboardButton(text='2', callback_data=utils.NumCallbackData(num=2).pack())
     )
-    
+    builder.row(types.InlineKeyboardButton(text='Без подгруппы', callback_data=utils.NumCallbackData(num=0).pack()))
     builder.row(keyboards.CANCEL_BUTTON)
     
     await call.message.edit_text(f"Группа: <b>{group.name}</b>\n"
@@ -127,17 +126,24 @@ async def handle_ask_subgroup(call: types.CallbackQuery, callback_data: utils.Nu
     subgroup = callback_data.num if callback_data.num > 0 else None
     user_id = call.from_user.id
     
-    users_database.add_user(models.User(user_id, models.UserGroupWithName(group_name, group_id, subgroup)))
+    users_database.insert_user(models.User(user_id, models.UserGroupWithName(group_name, group_id, subgroup)))
     
     await call.message.edit_text("<b>Отлично, всё готово!</b> 🎉")
     
     await call.message.answer("Теперь я могу привязывать твои заметки к расписанию.\n"
-                              "Просто напиши мне что-нибудь во время пары — я пойму, к какому предмету это относится.", reply_markup=keyboards.MAIN_KEYBOARD)
+                              "Просто напиши мне что-нибудь во время пары — я пойму, к какому предмету это относится.",
+                              reply_markup=keyboards.MAIN_KEYBOARD)
     
     await state.clear()
     
+async def handle_cancel(call: types.CallbackQuery, state: FSMContext):
+    await state.clear()
+    
+    await call.answer()
+    await call.message.reply("Регистрация отменена.", reply_markup=keyboards.START_KEYBOARD)
     
 def register(router: Router):
+    router.callback_query.register(handle_cancel, StateFilter(RegisterUserState), F.data == keyboards.CANCEL_BUTTON.callback_data)
     router.message.register(handle_configure_group, StateFilter(None), F.text == keyboards.CONFIGURE_GROUP_BUTTON.text)
     router.callback_query.register(handle_ask_faculty, StateFilter(RegisterUserState.Faculty), utils.NumCallbackData.filter())
     router.callback_query.register(handle_ask_form, StateFilter(RegisterUserState.Form), utils.NumCallbackData.filter())

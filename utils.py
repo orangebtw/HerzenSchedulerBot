@@ -1,7 +1,7 @@
 from typing import Iterable
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.filters.callback_data import CallbackData
-from aiogram.types import InlineKeyboardMarkup
+from aiogram import types
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 from contextlib import contextmanager
@@ -73,7 +73,7 @@ def user_reminder_times_to_text(user: models.User) -> str:
 LOCALE_LOCK = threading.Lock()
 
 @contextmanager
-def set_time_locale(name: str):
+def time_locale(name: str):
     with LOCALE_LOCK:
         saved = locale.setlocale(locale.LC_TIME)
         try:

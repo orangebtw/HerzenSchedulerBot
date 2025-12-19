@@ -5,7 +5,7 @@ from aiogram_dialog import setup_dialogs
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums.parse_mode import ParseMode
 
-from handlers import base_handler, register_handler, configure_user_handler, configure_reminders_handler
+from handlers import base_handler, register_handler, configure_user_handler, configure_reminders_handler, reminder_creation_handler
 
 import utils
 import database
@@ -25,16 +25,22 @@ async def on_startup(groups_database: database.GroupsDatabase, schedules_databas
     loop = asyncio.get_event_loop()
     loop.create_task(update_groups_and_clear_schedules('00:00', groups_database=groups_database, schedules_database=schedules_database))
     
+async def on_shutdown(users_database: database.UsersDatabase, notes_database: database.NotesDatabase):
+    users_database.close()
+    notes_database.close()
+    
 async def main():
     registration_router = Router()
     configure_user_router = Router()
     configure_reminders_router = Router()
+    reminder_creation_router = Router()
     base_router = Router()
     
     register_handler.register(registration_router)
     configure_user_handler.register(configure_user_router)
     configure_reminders_handler.register(configure_reminders_router)
     base_handler.register(base_router)
+    reminder_creation_handler.register(reminder_creation_router)
     
     dp = Dispatcher(
         groups_database=database.GroupsDatabase(),
@@ -44,10 +50,12 @@ async def main():
     )
     
     dp.startup.register(on_startup)
+    dp.shutdown.register(on_shutdown)
     dp.include_router(registration_router)
     dp.include_router(configure_user_router)
     dp.include_router(configure_reminders_router)
     dp.include_router(base_router)
+    dp.include_router(reminder_creation_router)
     
     setup_dialogs(dp)
     

@@ -32,12 +32,12 @@ class User:
     
 @dataclass
 class UserNote:
-    id: uuid.UUID = field(default_factory=uuid.uuid4, init=False)
     user_id: UserId
     subject_id: str
     text: str
-    time: datetime
+    due_date: datetime
     done: bool = field(default=False, init=False)
+    id: int = field(default=None)
     
     def __hash__(self):
         return hash(self.id)

@@ -82,15 +82,18 @@ async def handle_get_time(message: types.Message, state: FSMContext, users_datab
             await message.answer(f"⏰ Укажите количесто <b>часов</b> от {range_start} до {range_end} включительно, за которое необходимо напоминать в {current}-й раз.",
                                 reply_markup=builder.as_markup())
     else:
-        with users_database.get_user_by_id(message.from_user.id) as user:
-            assert(user is not None)
-            reminder_times = list(user.reminder_times)
+        user = users_database.get_user_by_id(message.from_user.id)
+        assert(user is not None)
         
-            for i in range(0, len(values) - 1):
-                reminder_times[i] = models.UserReminderTime(timedelta(hours=values[i]))
-            reminder_times[-1] = models.UserReminderTime(timedelta(minutes=values[-1]))
+        reminder_times = list(user.reminder_times)
     
-            user.reminder_times = tuple(reminder_times)
+        for i in range(0, len(values) - 1):
+            reminder_times[i] = models.UserReminderTime(timedelta(hours=values[i]))
+        reminder_times[-1] = models.UserReminderTime(timedelta(minutes=values[-1]))
+
+        user.reminder_times = tuple(reminder_times)
+        
+        users_database.insert_user(user)
         
         await message.answer("✅ <b>Напоминания о дедлайнах успешно обновлены!</b>")
         
