@@ -26,6 +26,16 @@ async def update_groups_and_clear_schedules(time: str, groups_database: database
         logging.info("Fetched schedules")
         await asyncio.sleep(utils.seconds_before_time(time))
 
+async def send_notification(note: models.UserNote, now: datetime):
+    remaining_text = utils.seconds_to_text((note.due_date - now).total_seconds())
+    
+    if note.subject_id is not None:
+        await bot.send_message(note.user_id, text=f"📣 <b>Напоминание о дедлайне</b>\n\nПредмет: <b>{note.subject_id}</b>\nЗадание: \"{note.text}\"\n\nДо дедлайна осталось: <b>{remaining_text}</b>.")
+    else:
+        with utils.time_locale('ru_RU.UTF-8'):
+            date_text: str = note.due_date.strftime("%d %b %Y")
+        await bot.send_message(note.user_id, text=f"📣 <b>Напоминание о дедлайне</b>\n\nЧерез <b>{remaining_text}</b> истечёт дедлайн по личной заметки:\n\"{note.text}\" к <b>{date_text}</b>.")
+
 async def notify_of_reminders(notes_database: database.NotesDatabase, users_database: database.UsersDatabase):
     while True:
         now = datetime.now(tz=utils.DEFAULT_TIMEZONE)
@@ -52,13 +62,12 @@ async def notify_of_reminders(notes_database: database.NotesDatabase, users_data
             else:
                 reminder_time = user.reminder_times[note.reminded_times]
                 if now >= note.due_date - reminder_time.value:
-                    remaining_text = utils.seconds_to_text((note.due_date - now).total_seconds())
                     try:
-                        await bot.send_message(note.user_id, text=f"📣 <b>Напоминание о дедлайне</b>\n\nОсталось {remaining_text}, чтобы сдать задание по дисциплине \"{note.subject_id}\": \"{note.text}\".")
+                        await send_notification(note, now)
                         note.reminded_times += 1
                         logger.info(f"Sent {note.reminded_times} reminder to user {note.user_id}")
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.error(f"Failed to send {note.reminded_times} reminder to user {note.user_id}: {e}")
                     await asyncio.sleep(0.5)
             
             notes_database.update_note(note)

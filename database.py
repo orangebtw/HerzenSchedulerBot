@@ -119,7 +119,7 @@ class NotesDatabase:
         self.cur.execute(f"""CREATE TABLE IF NOT EXISTS {NotesDatabase.DATABASE_NAME} (
             id INTEGER PRIMARY KEY NOT NULL,
             user_id INTEGER NOT NULL,
-            subject_id TEXT NOT NULL,
+            subject_id TEXT,
             content TEXT NOT NULL,
             due_date TIMESTAMP NOT NULL,
             reminded_times INTEGER NOT NULL DEFAULT 0,

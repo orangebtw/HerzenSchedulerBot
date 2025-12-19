@@ -144,7 +144,7 @@ async def handle_ask_subgroup(call: types.CallbackQuery, callback_data: utils.Nu
     await state.clear()
     
     logger.info(f"User {call.from_user.id} updated the group successfully")
-    
+ 
     
 def register(router: Router):
     router.callback_query.register(handle_configure_group, StateFilter(MainState.Settings), utils.NumCallbackData.filter(F.num == 1))
@@ -154,3 +154,5 @@ def register(router: Router):
     router.callback_query.register(handle_ask_course, StateFilter(ConfigureUserState.Course), utils.NumCallbackData.filter())
     router.callback_query.register(handle_ask_group, StateFilter(ConfigureUserState.Group), utils.NumCallbackData.filter())
     router.callback_query.register(handle_ask_subgroup, StateFilter(ConfigureUserState.SubGroup), utils.NumCallbackData.filter())
+    
+    

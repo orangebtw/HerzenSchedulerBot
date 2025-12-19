@@ -9,7 +9,7 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram_dialog import DialogManager, StartMode, Dialog, Window
 from aiogram_dialog.widgets.kbd.button import Button
 from aiogram_dialog.widgets.kbd.state import Cancel
-from aiogram_dialog.widgets.kbd.calendar_kbd import Calendar, CalendarConfig, CalendarScope, CalendarScopeView, CalendarDaysView, CalendarMonthView, CalendarYearsView
+from aiogram_dialog.widgets.kbd.calendar_kbd import Calendar, CalendarConfig, CalendarUserConfig, CalendarScope, CalendarScopeView, CalendarDaysView, CalendarMonthView, CalendarYearsView
 from aiogram_dialog.widgets.text import Const, Format, Text
 
 from babel.dates import get_day_names, get_month_names
@@ -26,22 +26,26 @@ import utils
 import parse
 import models
 
+
 class DialogState(StatesGroup):
     NoSubjectCurrently = State()
     AskDueDate = State()
-    
+
+
 class WeekDay(Text):
     async def _render_text(self, data, manager: DialogManager) -> str:
         selected_date: date = data["date"]
         locale = manager.event.from_user.language_code
         return get_day_names(width="abbreviated", context="stand-alone", locale=locale)[selected_date.weekday()].title()
-    
+
+
 class Month(Text):
     async def _render_text(self, data, manager: DialogManager) -> str:
         selected_date: date = data["date"]
         locale = manager.event.from_user.language_code
         return get_month_names("wide", context="stand-alone", locale=locale)[selected_date.month].title()
-    
+
+
 class CustomCalendar(Calendar):
     def _init_views(self) -> dict[CalendarScope, CalendarScopeView]:
         return {
@@ -62,6 +66,9 @@ class CustomCalendar(Calendar):
             ),
         }
 
+    async def _get_user_config(self, data: dict, manager: DialogManager) -> CalendarUserConfig:
+        return CalendarUserConfig(min_date=data['calendar_min_date'])
+
 async def handle_new_reminder(
     message: types.Message,
     bot: Bot,
@@ -78,8 +85,7 @@ async def handle_new_reminder(
     assert(user is not None)
 
     async with ChatActionSender(bot=bot, chat_id=message.chat.id, action=ChatAction.TYPING):
-        # date = message.date.astimezone(utils.DEFAULT_TIMEZONE)
-        date = datetime.combine(message.date.date(), time(hour=9, minute=50), tzinfo=utils.DEFAULT_TIMEZONE)
+        date = message.date.astimezone(utils.DEFAULT_TIMEZONE)
         found_subject: parse.ScheduleSubject | None = None
         last_subject: parse.ScheduleSubject = None
         
@@ -112,31 +118,6 @@ async def handle_new_reminder(
             await state.update_data(note_text=message.text)
             await state.set_state(NoteCreationState.IsCurrentSubjectCorrect)
 
-
-async def handle_due_date_selected(
-    call: types.CallbackQuery,
-    widget,
-    manager: DialogManager,
-    selected_date: date
-):  
-    subject: parse.ScheduleSubject = manager.start_data['subject']
-    note_text: str = manager.start_data['note_text']
-    user_id: int = manager.start_data['user_id']
-    notes_database: database.NotesDatabase = manager.start_data['notes_database']
-    
-    if selected_date < datetime.now(tz=utils.DEFAULT_TIMEZONE).date():
-        await call.message.reply("❗ Дата не должна быть раньше сегодняшнего дня.")
-        await manager.done()
-        return
-    
-    with utils.time_locale('ru_RU.UTF-8'):
-        date_text: str = selected_date.strftime("%d %b %Y")
-    
-    notes_database.insert_note(models.UserNote(user_id, subject, note_text, datetime.combine(selected_date, time(hour=23, minute=59), tzinfo=utils.DEFAULT_TIMEZONE)))
-    
-    await call.message.edit_text(f"✅ Сохранено задание по предмету <b>{subject}</b>: \"{note_text}\" к <b>{date_text}</b>.")
-    
-    await manager.done()
 
 async def handle_subject_not_correct(
     call: types.CallbackQuery,
@@ -192,6 +173,7 @@ async def handle_subject_is_correct(
                                      'user_id': call.from_user.id,
                                      'notes_database': notes_database})
 
+
 async def handle_get_custom_subject(call: types.CallbackQuery, callback_data: NumCallbackData, state: FSMContext, dialog_manager: DialogManager, notes_database: database.NotesDatabase):
     await call.answer()
     
@@ -208,15 +190,63 @@ async def handle_get_custom_subject(call: types.CallbackQuery, callback_data: Nu
                                      'notes_database': notes_database})
 
 
-async def handle_create_note(call: types.CallbackQuery, state: FSMContext):
-    pass
+async def handle_create_note(call: types.CallbackQuery, state: FSMContext, dialog_manager: DialogManager, notes_database: database.NotesDatabase):
+    await call.answer()
+    
+    note_text = await state.get_value("note_text")
+    
+    await state.clear()
+    
+    await dialog_manager.start(DialogState.AskDueDate,
+                               mode=StartMode.RESET_STACK,
+                               data={'note_text': note_text,
+                                     'user_id': call.from_user.id,
+                                     'notes_database': notes_database})
+
+
+async def handle_due_date_selected(
+    call: types.CallbackQuery,
+    widget,
+    manager: DialogManager,
+    selected_date: date
+):  
+    subject: parse.ScheduleSubject | None = manager.start_data.get('subject', None)
+    note_text: str = manager.start_data['note_text']
+    user_id: int = manager.start_data['user_id']
+    notes_database: database.NotesDatabase = manager.start_data['notes_database']
+    
+    if selected_date < datetime.now(tz=utils.DEFAULT_TIMEZONE).date():
+        await call.message.reply("❗ Дата не должна быть раньше сегодняшнего дня.")
+        await manager.done()
+        return
+    
+    with utils.time_locale('ru_RU.UTF-8'):
+        date_text: str = selected_date.strftime("%d %b %Y")
+    
+    notes_database.insert_note(models.UserNote(user_id, subject, note_text, datetime.combine(selected_date, time(hour=23, minute=59), tzinfo=utils.DEFAULT_TIMEZONE)))
+    
+    if subject is not None:
+        await call.message.edit_text(f"✅ Сохранено задание по предмету <b>{subject}</b>: \"{note_text}\" к <b>{date_text}</b>.")
+    else:
+        await call.message.edit_text(f"✅ Сохранена личная заметка: \"{note_text}\" к <b>{date_text}</b>.")
+    
+    await manager.done()
+
 
 async def no_subject_currently_getter(dialog_manager: DialogManager, **kwargs):
     subject: parse.ScheduleSubject = dialog_manager.start_data['subject']
     return {
-        'recent_subject': subject.name
+        'recent_subject': subject
     }
-    
+
+
+async def ask_deadline_getter(dialog_manager: DialogManager, **kwargs):
+    min_date = datetime.now(tz=utils.DEFAULT_TIMEZONE).date()
+    return {
+        'calendar_min_date': min_date
+    }
+
+
 async def on_recent_subject_button_click(call: types.CallbackQuery, button: Button, manager: DialogManager):
     if manager.is_preview():
         await manager.next()
@@ -225,10 +255,14 @@ async def on_recent_subject_button_click(call: types.CallbackQuery, button: Butt
     
 
 async def on_create_note_button_click(call: types.CallbackQuery, button: Button, manager: DialogManager):
-    raise NotImplementedError
+    manager.start_data['subject'] = None
+    
+    await manager.next()
+
 
 async def on_cancel_button_click(call: types.CallbackQuery, button: Button, manager: DialogManager):
     await call.message.edit_text("Отменено.")
+
 
 def register(router: Router):
     router.message.register(handle_new_reminder, StateFilter(None))
@@ -248,8 +282,9 @@ def register(router: Router):
         ),
         Window(
             Const("📅 Когда дедлайн?"),
-            CustomCalendar(id='due_date_calendar', on_click=handle_due_date_selected, config=CalendarConfig(timezone=utils.DEFAULT_TIMEZONE, min_date=datetime.now(tz=utils.DEFAULT_TIMEZONE).date())),
+            CustomCalendar(id='due_date_calendar', on_click=handle_due_date_selected, config=CalendarConfig(firstweekday=1, timezone=utils.DEFAULT_TIMEZONE)),
             Cancel(text=Const("Отмена"), on_click=on_cancel_button_click),
+            getter=ask_deadline_getter,
             state=DialogState.AskDueDate,
         ),
     ))

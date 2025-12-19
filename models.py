@@ -33,7 +33,7 @@ class User:
 @dataclass
 class UserNote:
     user_id: UserId
-    subject_id: str
+    subject_id: str | None
     text: str
     due_date: datetime
     reminded_times: int = field(default=0)
