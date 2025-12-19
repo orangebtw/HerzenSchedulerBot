@@ -3,6 +3,7 @@ from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from datetime import timedelta
+import logging
 
 import utils
 import keyboards
@@ -10,6 +11,7 @@ import models
 import database
 from states import ConfigureReminderState, MainState
 
+logger = logging.getLogger(__name__)
 
 async def handle_configure_reminders(call: types.CallbackQuery, state: FSMContext):
     await call.answer()
@@ -52,7 +54,7 @@ async def handle_get_time(message: types.Message, state: FSMContext, users_datab
     range_end = values[current-2]-1 if current > 1 else 168
     
     if total > 1 and current == total:
-        range_end *= 24
+        range_end *= 60
     
     value = int(message.text)
     if not (range_start <= value <= range_end):
@@ -67,7 +69,7 @@ async def handle_get_time(message: types.Message, state: FSMContext, users_datab
     
     if current <= total:
         if total > 1 and current == total:
-            range_end *= 24
+            range_end *= 60
         
         await state.update_data(current=current)
         await state.update_data(values=values)
@@ -98,6 +100,8 @@ async def handle_get_time(message: types.Message, state: FSMContext, users_datab
         await message.answer("✅ <b>Напоминания о дедлайнах успешно обновлены!</b>")
         
         await state.clear()
+        
+        logger.info(f"User {message.from_user.id} updated reminder times")
 
 def register(router: Router):
     router.callback_query.register(handle_configure_reminders, StateFilter(MainState.Settings), utils.NumCallbackData.filter(F.num == 2))

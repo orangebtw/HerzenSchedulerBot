@@ -7,9 +7,14 @@ import utils
 import keyboards
 import models
 import database
+import logging
 from states import ConfigureUserState, MainState
 
+logger = logging.getLogger(__name__)
+
 async def handle_configure_group(call: types.CallbackQuery, state: FSMContext, groups_database: database.GroupsDatabase):
+    logger.info(f"User {call.from_user.id} has started updating the group")
+    
     with groups_database.get_groups() as groups:
         msg_text, keyboard = utils.generate_choice_message(groups)
         
@@ -137,6 +142,8 @@ async def handle_ask_subgroup(call: types.CallbackQuery, callback_data: utils.Nu
     await call.message.edit_text("✅ <b>Группа успешна обновлена!</b>")
     
     await state.clear()
+    
+    logger.info(f"User {call.from_user.id} updated the group successfully")
     
     
 def register(router: Router):

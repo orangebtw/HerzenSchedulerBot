@@ -34,6 +34,30 @@ def generate_choice_message(iterable: Iterable) -> tuple[str, InlineKeyboardBuil
         builder.button(text=str(i+1), callback_data=NumCallbackData(num=i).pack())
     return (msg_text, builder)
 
+def seconds_to_text(seconds: int) -> str:
+    text = ""
+    
+    if seconds >= 86400:
+        d = int(seconds / 86400)
+        seconds -= d * 86400
+        text += f"<b>{d} д.</b>"
+        if seconds > 0:
+            text += " "
+        
+    if seconds >= 3600:
+        h = int(seconds / 3600)
+        seconds -= h * 3600
+        text += f"<b>{h} ч.</b>"
+        if seconds > 0:
+            text += " "
+        
+    if seconds >= 60:
+        m = int(seconds / 60)
+        seconds -= m * 60
+        text += f"<b>{m} м.</b>"
+    
+    return text
+
 def user_reminder_times_to_text(user: models.User) -> str:
     reminder_times_length = sum(True for x in user.reminder_times if x is not None)
     reminder_times_text = "За "
@@ -49,25 +73,8 @@ def user_reminder_times_to_text(user: models.User) -> str:
         elif i > 0 and i < reminder_times_length - 1:
             reminder_times_text += ", за "
             
-        secs = t.total_seconds()
+        reminder_times_text += seconds_to_text(t.total_seconds())
         
-        if secs >= 86400:
-            d = int(secs / 86400)
-            secs -= d * 86400
-            reminder_times_text += f"<b>{d} д.</b>"
-            if secs > 0:
-                reminder_times_text += " "
-            
-        if secs >= 3600:
-            h = int(secs / 3600)
-            secs -= h * 3600
-            reminder_times_text += f"<b>{h} ч.</b>"
-            if secs > 0:
-                reminder_times_text += " "
-            
-        if secs >= 60:
-            m = int(secs / 60)
-            reminder_times_text += f"<b>{m} м.</b>"
     return reminder_times_text
 
 LOCALE_LOCK = threading.Lock()

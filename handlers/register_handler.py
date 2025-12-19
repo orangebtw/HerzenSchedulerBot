@@ -7,9 +7,14 @@ import utils
 import keyboards
 import models
 import database
+import logging
 from states import RegisterUserState
 
+logger = logging.getLogger(__name__)
+
 async def handle_configure_group(message: types.Message, state: FSMContext, groups_database: database.GroupsDatabase):
+    logger.info(f"User {message.from_user.id} has started registration")
+    
     with groups_database.get_groups() as groups:
         msg_text, keyboard = utils.generate_choice_message(groups)
         
@@ -136,15 +141,19 @@ async def handle_ask_subgroup(call: types.CallbackQuery, callback_data: utils.Nu
     
     await state.clear()
     
+    logger.info(f"Registered user with the id {user_id}")
+    
 async def handle_cancel(call: types.CallbackQuery, state: FSMContext):
+    logger.info(f"User {call.from_user.id} has cancelled registration")
+    
     await state.clear()
     
     await call.answer()
-    await call.message.reply("Регистрация отменена.", reply_markup=keyboards.START_KEYBOARD)
+    await call.message.edit_text("Регистрация отменена.", reply_markup=keyboards.START_KEYBOARD)
     
 def register(router: Router):
-    router.callback_query.register(handle_cancel, StateFilter(RegisterUserState), F.data == keyboards.CANCEL_BUTTON.callback_data)
     router.message.register(handle_configure_group, StateFilter(None), F.text == keyboards.CONFIGURE_GROUP_BUTTON.text)
+    router.callback_query.register(handle_cancel, StateFilter(RegisterUserState), F.data == keyboards.CANCEL_BUTTON.callback_data)
     router.callback_query.register(handle_ask_faculty, StateFilter(RegisterUserState.Faculty), utils.NumCallbackData.filter())
     router.callback_query.register(handle_ask_form, StateFilter(RegisterUserState.Form), utils.NumCallbackData.filter())
     router.callback_query.register(handle_ask_stage, StateFilter(RegisterUserState.Stage), utils.NumCallbackData.filter())

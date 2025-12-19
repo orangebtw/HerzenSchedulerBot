@@ -4,8 +4,6 @@ from aiogram.filters import CommandStart, StateFilter
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from itertools import groupby
 
-from datetime import datetime
-
 import constants
 import keyboards
 import database
@@ -14,8 +12,9 @@ from states import MainState
 from utils import NumCallbackData
 from handlers.utils import check_user_exists
 
-async def handle_start(message: types.Message, users_database: database.UsersDatabase):
+async def handle_start(message: types.Message, users_database: database.UsersDatabase, notes_database: database.NotesDatabase):
     users_database.delete_by_id(message.from_user.id)
+    notes_database.delete_by_user_id(message.from_user.id)
     
     await message.reply(f"Привет! Я <b>{constants.BOT_NAME}</b> – помогу организовать учебный процесс. Я буду запоминать твои заметки и дедлайны, привязывая их к расписанию.",
                         reply_markup=keyboards.START_KEYBOARD)
@@ -25,8 +24,7 @@ async def handle_cancel(call: types.CallbackQuery, state: FSMContext):
     await state.clear()
     
     await call.answer()
-    await call.message.reply("Настройка отменена.")
-    await call.message.delete_reply_markup()
+    await call.message.edit_text("Настройка отменена.")
 
 async def handle_settings(message: types.Message, state: FSMContext, users_database: database.UsersDatabase):
     if not await check_user_exists(message, users_database=users_database):
@@ -67,15 +65,23 @@ async def handle_my_deadlines(message: types.Message, state: FSMContext, users_d
     count, notes = notes_database.get_notes_by_user_id(message.from_user.id)
     
     if count > 0:
+        sorted_notes = sorted(notes, key=lambda n: n.due_date)
+        
         msg_text = ""
         i = 0
-        for subject, notes in groupby(notes, lambda n: n.subject_id):
+        for subject, notes in groupby(sorted_notes, lambda n: n.subject_id):
             msg_text += f"<b>{subject}</b>\n"
             for note in notes:
                 with utils.time_locale('ru_RU.UTF-8'):
                     date_text: str = note.due_date.strftime("%d %b %Y")
-                msg_text += f"    {i+1}) \"{note.text}\" — к {date_text}\n"
+                msg_text += f"    {i+1}) "
+                if note.is_completed:
+                    msg_text += f"<s>\"{note.text}\" — к {date_text}</s>"
+                else:
+                    msg_text += f"\"{note.text}\" — к {date_text}"
                 i += 1
+                msg_text += '\n'
+                    
             msg_text += "\n"
             
         await message.reply(f"Ваши дедлайны:\n{msg_text}")

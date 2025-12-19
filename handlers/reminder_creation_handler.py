@@ -124,6 +124,11 @@ async def handle_due_date_selected(
     user_id: int = manager.start_data['user_id']
     notes_database: database.NotesDatabase = manager.start_data['notes_database']
     
+    if selected_date < datetime.now(tz=utils.DEFAULT_TIMEZONE).date():
+        await call.message.reply("❗ Дата не должна быть раньше сегодняшнего дня.")
+        await manager.done()
+        return
+    
     with utils.time_locale('ru_RU.UTF-8'):
         date_text: str = selected_date.strftime("%d %b %Y")
     
@@ -243,7 +248,7 @@ def register(router: Router):
         ),
         Window(
             Const("📅 Когда дедлайн?"),
-            CustomCalendar(id='due_date_calendar', on_click=handle_due_date_selected, config=CalendarConfig(timezone=utils.DEFAULT_TIMEZONE)),
+            CustomCalendar(id='due_date_calendar', on_click=handle_due_date_selected, config=CalendarConfig(timezone=utils.DEFAULT_TIMEZONE, min_date=datetime.now(tz=utils.DEFAULT_TIMEZONE).date())),
             Cancel(text=Const("Отмена"), on_click=on_cancel_button_click),
             state=DialogState.AskDueDate,
         ),

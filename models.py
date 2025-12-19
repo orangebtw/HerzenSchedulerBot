@@ -36,7 +36,8 @@ class UserNote:
     subject_id: str
     text: str
     due_date: datetime
-    done: bool = field(default=False, init=False)
+    reminded_times: int = field(default=0)
+    is_completed: bool = field(default=False)
     id: int = field(default=None)
     
     def __hash__(self):
