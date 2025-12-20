@@ -41,8 +41,8 @@ class ScheduleFaculty:
 
 @dataclass(frozen=True)
 class ScheduleSubject:
-    time_start: time
-    time_end: time
+    time_start: datetime
+    time_end: datetime
     mod: str
     name: str
     type: str

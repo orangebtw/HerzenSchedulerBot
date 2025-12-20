@@ -91,3 +91,6 @@ def time_locale(name: str):
             
 async def schedule_reminder(until: datetime):
     pass
+
+def tz_now() -> datetime:
+    return datetime.now(tz=DEFAULT_TIMEZONE)

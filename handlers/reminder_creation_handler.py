@@ -9,16 +9,23 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram_dialog import DialogManager, StartMode, Dialog, Window
 from aiogram_dialog.widgets.kbd.button import Button
 from aiogram_dialog.widgets.kbd.state import Cancel
+from aiogram_dialog.widgets.kbd.select import Select
 from aiogram_dialog.widgets.kbd.calendar_kbd import Calendar, CalendarConfig, CalendarUserConfig, CalendarScope, CalendarScopeView, CalendarDaysView, CalendarMonthView, CalendarYearsView
 from aiogram_dialog.widgets.text import Const, Format, Text
+from aiogram_dialog.widgets.kbd.group import Group
 
 from babel.dates import get_day_names, get_month_names
 
 from datetime import datetime, timedelta, date, time
 
+from itertools import islice
+from cytoolz.itertoolz import unique
+
 from states import NoteCreationState
 from utils import NumCallbackData
 from handlers.utils import check_user_exists
+
+import operator
 
 import keyboards
 import database
@@ -27,9 +34,10 @@ import parse
 import models
 
 
-class DialogState(StatesGroup):
+class DueDateDialogState(StatesGroup):
     NoSubjectCurrently = State()
     AskDueDate = State()
+    AskCustomDueDate = State()
 
 
 class WeekDay(Text):
@@ -76,7 +84,6 @@ async def handle_new_reminder(
     dialog_manager: DialogManager,
     schedules_database: database.SchedulesDatabase,
     users_database: database.UsersDatabase,
-    notes_database: database.NotesDatabase
 ):
     if not await check_user_exists(message, users_database=users_database):
         return
@@ -101,12 +108,11 @@ async def handle_new_reminder(
                     break
             
         if found_subject is None:
-            await dialog_manager.start(DialogState.NoSubjectCurrently,
+            await dialog_manager.start(DueDateDialogState.NoSubjectCurrently,
                                        mode=StartMode.RESET_STACK,
                                        data={'subject': last_subject.name,
                                              'note_text': message.text,
-                                             'user_id': user.id,
-                                             'notes_database': notes_database})
+                                             'user': user})
         else:
             builder = InlineKeyboardBuilder()
             builder.row(keyboards.INLINE_YES_BUTTON, keyboards.INLINE_NO_BUTTON)
@@ -116,6 +122,7 @@ async def handle_new_reminder(
                                 reply_markup=builder.as_markup())
             await state.update_data(subject=found_subject)
             await state.update_data(note_text=message.text)
+            await state.update_data(user=user)
             await state.set_state(NoteCreationState.IsCurrentSubjectCorrect)
 
 
@@ -153,55 +160,79 @@ async def handle_subject_not_correct(
     await state.set_state(NoteCreationState.AskCustomSubject)
 
 
+def get_next_classes(schedules_database: database.SchedulesDatabase, user: models.User, subject: str, count: int) -> list[parse.ScheduleSubject]:
+    with schedules_database.get_subjects(user.group.id, user.group.subgroup) as schedules:
+        next_classes = islice(unique(filter(lambda subj: subj.name == subject, schedules), key=lambda subj: subj.time_start.date()), count)
+    return list(next_classes)
+
+
 async def handle_subject_is_correct(
     call: types.CallbackQuery,
     state: FSMContext,
     dialog_manager: DialogManager,
-    notes_database: database.NotesDatabase
+    schedules_database: database.SchedulesDatabase
 ):
     await call.answer()
     
     subject: parse.ScheduleSubject = await state.get_value('subject')
     note_text = await state.get_value("note_text")
+    user = await state.get_value("user")
     
     await state.clear()
     
-    await dialog_manager.start(DialogState.AskDueDate,
-                               mode=StartMode.RESET_STACK,
-                               data={'subject': subject.name,
-                                     'note_text': note_text,
-                                     'user_id': call.from_user.id,
-                                     'notes_database': notes_database})
+    next_classes = get_next_classes(schedules_database, user, subject, 3)
+    if len(next_classes) > 0:
+        await dialog_manager.start(DueDateDialogState.AskDueDate,
+                                mode=StartMode.RESET_STACK,
+                                data={'subject': subject.name,
+                                      'note_text': note_text,
+                                      'user': user,
+                                      'next_classes': next_classes})
+    else:
+        await dialog_manager.start(DueDateDialogState.AskCustomDueDate,
+                                mode=StartMode.RESET_STACK,
+                                data={'subject': subject.name,
+                                      'note_text': note_text,
+                                      'user': user,})
 
 
-async def handle_get_custom_subject(call: types.CallbackQuery, callback_data: NumCallbackData, state: FSMContext, dialog_manager: DialogManager, notes_database: database.NotesDatabase):
+async def handle_get_custom_subject(
+    call: types.CallbackQuery,
+    callback_data: NumCallbackData,
+    state: FSMContext,
+    dialog_manager: DialogManager,
+    schedules_database: database.SchedulesDatabase
+):
     await call.answer()
     
     note_text = await state.get_value("note_text")
     subject_name = (await state.get_value('subject_names'))[callback_data.num]
+    user = await state.get_value('user')
     
     await state.clear()
     
-    await dialog_manager.start(DialogState.AskDueDate,
+    next_classes = get_next_classes(schedules_database, user, subject_name, 3)
+    
+    await dialog_manager.start(DueDateDialogState.AskDueDate,
                                mode=StartMode.RESET_STACK,
                                data={'subject': subject_name,
                                      'note_text': note_text,
-                                     'user_id': call.from_user.id,
-                                     'notes_database': notes_database})
+                                     'user': user,
+                                     'next_classes': next_classes})
 
 
-async def handle_create_note(call: types.CallbackQuery, state: FSMContext, dialog_manager: DialogManager, notes_database: database.NotesDatabase):
+async def handle_create_note(call: types.CallbackQuery, state: FSMContext, dialog_manager: DialogManager):
     await call.answer()
     
     note_text = await state.get_value("note_text")
+    user = await state.get_value("user")
     
     await state.clear()
     
-    await dialog_manager.start(DialogState.AskDueDate,
+    await dialog_manager.start(DueDateDialogState.AskCustomDueDate,
                                mode=StartMode.RESET_STACK,
                                data={'note_text': note_text,
-                                     'user_id': call.from_user.id,
-                                     'notes_database': notes_database})
+                                     'user': user})
 
 
 async def handle_due_date_selected(
@@ -212,10 +243,10 @@ async def handle_due_date_selected(
 ):  
     subject: parse.ScheduleSubject | None = manager.start_data.get('subject', None)
     note_text: str = manager.start_data['note_text']
-    user_id: int = manager.start_data['user_id']
-    notes_database: database.NotesDatabase = manager.start_data['notes_database']
+    user: models.User = manager.start_data['user']
+    notes_database: database.NotesDatabase = manager.middleware_data['notes_database']
     
-    if selected_date < datetime.now(tz=utils.DEFAULT_TIMEZONE).date():
+    if selected_date < utils.tz_now().date():
         await call.message.reply("❗ Дата не должна быть раньше сегодняшнего дня.")
         await manager.done()
         return
@@ -223,7 +254,7 @@ async def handle_due_date_selected(
     with utils.time_locale('ru_RU.UTF-8'):
         date_text: str = selected_date.strftime("%d %b %Y")
     
-    notes_database.insert_note(models.UserNote(user_id, subject, note_text, datetime.combine(selected_date, time(hour=23, minute=59), tzinfo=utils.DEFAULT_TIMEZONE)))
+    notes_database.insert_note(models.UserNote(user.id, subject, note_text, datetime.combine(selected_date - timedelta(days=1), time(hour=23, minute=59), tzinfo=utils.DEFAULT_TIMEZONE)))
     
     if subject is not None:
         await call.message.edit_text(f"✅ Сохранено задание по предмету <b>{subject}</b>: \"{note_text}\" к <b>{date_text}</b>.")
@@ -233,6 +264,11 @@ async def handle_due_date_selected(
     await manager.done()
 
 
+async def on_class_selected(call: types.CallbackQuery, widget, manager: DialogManager, item_id: int):
+    next_class: parse.ScheduleSubject = manager.start_data['next_classes'][item_id]
+    
+    await handle_due_date_selected(call, widget, manager, selected_date=next_class.time_start.date())
+
 async def no_subject_currently_getter(dialog_manager: DialogManager, **kwargs):
     subject: parse.ScheduleSubject = dialog_manager.start_data['subject']
     return {
@@ -240,24 +276,49 @@ async def no_subject_currently_getter(dialog_manager: DialogManager, **kwargs):
     }
 
 
-async def ask_deadline_getter(dialog_manager: DialogManager, **kwargs):
-    min_date = datetime.now(tz=utils.DEFAULT_TIMEZONE).date()
+async def ask_custom_deadline_getter(dialog_manager: DialogManager, **kwargs):
+    min_date = utils.tz_now().date()
     return {
         'calendar_min_date': min_date
     }
 
+async def ask_deadline_getter(dialog_manager: DialogManager, **kwargs):
+    def map_subject():
+        now = utils.tz_now()
+        
+        def inner(subject: parse.ScheduleSubject) -> str:
+            with utils.time_locale('ru_RU.UTF-8'):
+                delta = subject.time_start - now
+                date_text = subject.time_start .strftime("%a, %d %b")
+                return (subject.time_start, f"{date_text} (Через {delta.days} д.)")
+        return inner
+    
+    next_classes = map(map_subject(), dialog_manager.start_data['next_classes'])
+    
+    return {
+        "next_classes": enumerate(next_classes)
+    }
 
 async def on_recent_subject_button_click(call: types.CallbackQuery, button: Button, manager: DialogManager):
     if manager.is_preview():
         await manager.next()
         return
+    
+    schedules_database: database.SchedulesDatabase = manager.middleware_data['schedules_database']
+    user: models.User = manager.start_data['user']
+    subject: str = manager.start_data['subject']
+    
+    manager.start_data['next_classes'] = get_next_classes(schedules_database, user, subject, 3)
+    
     await manager.next()
     
 
+async def on_custom_due_date_button_clicK(call: types.CallbackQuery, button: Button, manager: DialogManager):
+    await manager.next()
+
 async def on_create_note_button_click(call: types.CallbackQuery, button: Button, manager: DialogManager):
     manager.start_data['subject'] = None
-    
-    await manager.next()
+    await manager.switch_to(DueDateDialogState.AskCustomDueDate)
 
 
 async def on_cancel_button_click(call: types.CallbackQuery, button: Button, manager: DialogManager):
@@ -278,13 +339,31 @@ def register(router: Router):
             Button(text=Format("Недавняя пара: {recent_subject}"), id="select_recent_subject", on_click=on_recent_subject_button_click),
             Cancel(text=Const("Отмена"), on_click=on_cancel_button_click),
             getter=no_subject_currently_getter,
-            state=DialogState.NoSubjectCurrently,
+            state=DueDateDialogState.NoSubjectCurrently,
         ),
         Window(
             Const("📅 Когда дедлайн?"),
-            CustomCalendar(id='due_date_calendar', on_click=handle_due_date_selected, config=CalendarConfig(firstweekday=1, timezone=utils.DEFAULT_TIMEZONE)),
+            Group(
+                Select(
+                    Format("{item[1][1]}"),
+                    id="select_next_class",
+                    item_id_getter=operator.itemgetter(0),
+                    type_factory=int,
+                    items="next_classes",
+                    on_click=on_class_selected,
+                ),
+                width=2
+            ),
+            Button(text=Const("📅 Выбрать другую дату"), id="button_custom_due_date", on_click=on_custom_due_date_button_clicK),
             Cancel(text=Const("Отмена"), on_click=on_cancel_button_click),
             getter=ask_deadline_getter,
-            state=DialogState.AskDueDate,
+            state=DueDateDialogState.AskDueDate
+        ),
+        Window(
+            Const("📅 Укажите свою дату"),
+            CustomCalendar(id='due_date_calendar', on_click=handle_due_date_selected, config=CalendarConfig(firstweekday=1, timezone=utils.DEFAULT_TIMEZONE)),
+            Cancel(text=Const("Отмена"), on_click=on_cancel_button_click),
+            getter=ask_custom_deadline_getter,
+            state=DueDateDialogState.AskCustomDueDate,
         ),
     ))
