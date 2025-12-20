@@ -1,7 +1,10 @@
 from aiogram.filters.callback_data import CallbackData
 
-class NumCallbackData(CallbackData, prefix="data-int"):
+class NumCallback(CallbackData, prefix="data-int"):
     num: int
     
-class NotificationCompleteCallbackData(CallbackData, prefix="nt-cmplt"):
+class NotificationCompleteCallback(CallbackData, prefix="nt-cmplt"):
+    note_id: int
+    
+class NoteEditCallback(CallbackData, prefix="nt-edit"):
     note_id: int

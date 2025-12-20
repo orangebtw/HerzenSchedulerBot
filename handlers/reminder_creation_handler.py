@@ -22,7 +22,7 @@ from itertools import islice
 from cytoolz.itertoolz import unique
 
 from states import NoteCreationState
-from callbacks import NumCallbackData
+from callbacks import NumCallback
 from handlers.utils import check_user_exists
 
 import operator
@@ -38,44 +38,6 @@ class DueDateDialogState(StatesGroup):
     NoSubjectCurrently = State()
     AskDueDate = State()
     AskCustomDueDate = State()
-
-
-class WeekDay(Text):
-    async def _render_text(self, data, manager: DialogManager) -> str:
-        selected_date: date = data["date"]
-        locale = manager.event.from_user.language_code
-        return get_day_names(width="abbreviated", context="stand-alone", locale=locale)[selected_date.weekday()].title()
-
-
-class Month(Text):
-    async def _render_text(self, data, manager: DialogManager) -> str:
-        selected_date: date = data["date"]
-        locale = manager.event.from_user.language_code
-        return get_month_names("wide", context="stand-alone", locale=locale)[selected_date.month].title()
-
-
-class CustomCalendar(Calendar):
-    def _init_views(self) -> dict[CalendarScope, CalendarScopeView]:
-        return {
-            CalendarScope.DAYS: CalendarDaysView(
-                self._item_callback_data,
-                weekday_text=WeekDay(),
-                header_text="🗓 " + Month() + " " + Format("{date:%Y}"),
-                next_month_text=Month() + ' >>',
-                prev_month_text='<< ' + Month()
-            ),
-            CalendarScope.MONTHS: CalendarMonthView(
-                self._item_callback_data,
-                month_text=Month(),
-                this_month_text="[" + Month() + "]",
-            ),
-            CalendarScope.YEARS: CalendarYearsView(
-                self._item_callback_data,
-            ),
-        }
-
-    async def _get_user_config(self, data: dict, manager: DialogManager) -> CalendarUserConfig:
-        return CalendarUserConfig(min_date=data['calendar_min_date'])
 
 async def handle_new_reminder(
     message: types.Message,
@@ -149,7 +111,7 @@ async def handle_subject_not_correct(
     
     for i, subject_name in enumerate(subject_names):
         subjects_text += f"{i+1}. <b>{subject_name}</b>\n"
-        builder.add(types.InlineKeyboardButton(text=str(i+1), callback_data=NumCallbackData(num=i).pack()))
+        builder.add(types.InlineKeyboardButton(text=str(i+1), callback_data=NumCallback(num=i).pack()))
         
     builder.row(keyboards.INLINE_CREATE_NOTE_BUTTON)
     builder.row(keyboards.CANCEL_BUTTON)
@@ -198,7 +160,7 @@ async def handle_subject_is_correct(
 
 async def handle_get_custom_subject(
     call: types.CallbackQuery,
-    callback_data: NumCallbackData,
+    callback_data: NumCallback,
     state: FSMContext,
     dialog_manager: DialogManager,
     schedules_database: database.SchedulesDatabase
@@ -330,7 +292,7 @@ def register(router: Router):
     router.callback_query.register(handle_subject_not_correct, StateFilter(NoteCreationState.IsCurrentSubjectCorrect), F.data == keyboards.INLINE_NO_BUTTON.callback_data)
     router.callback_query.register(handle_subject_is_correct, StateFilter(NoteCreationState.IsCurrentSubjectCorrect), F.data == keyboards.INLINE_YES_BUTTON.callback_data)
     router.callback_query.register(handle_create_note, StateFilter(NoteCreationState.AskCustomSubject), F.data == keyboards.INLINE_CREATE_NOTE_BUTTON.callback_data)
-    router.callback_query.register(handle_get_custom_subject, StateFilter(NoteCreationState.AskCustomSubject), NumCallbackData.filter())
+    router.callback_query.register(handle_get_custom_subject, StateFilter(NoteCreationState.AskCustomSubject), NumCallback.filter())
 
     router.include_router(Dialog(
         Window(
@@ -361,7 +323,7 @@ def register(router: Router):
         ),
         Window(
             Const("📅 Укажите свою дату"),
-            CustomCalendar(id='due_date_calendar', on_click=handle_due_date_selected, config=CalendarConfig(firstweekday=1, timezone=utils.DEFAULT_TIMEZONE)),
+            utils.CustomCalendar(id='due_date_calendar', on_click=handle_due_date_selected),
             Cancel(text=Const("Отмена"), on_click=on_cancel_button_click),
             getter=ask_custom_deadline_getter,
             state=DueDateDialogState.AskCustomDueDate,

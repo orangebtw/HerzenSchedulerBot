@@ -4,7 +4,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from aiogram.filters import StateFilter
 
 import utils
-from callbacks import NumCallbackData
+from callbacks import NumCallback
 import keyboards
 import models
 import database
@@ -25,7 +25,7 @@ async def handle_configure_group(message: types.Message, state: FSMContext, grou
     await state.set_state(RegisterUserState.Faculty)
 
 
-async def handle_ask_faculty(call: types.CallbackQuery, callback_data: NumCallbackData, state: FSMContext, groups_database: database.GroupsDatabase):
+async def handle_ask_faculty(call: types.CallbackQuery, callback_data: NumCallback, state: FSMContext, groups_database: database.GroupsDatabase):
     await call.answer()
     await state.update_data(faculty=callback_data.num)
     
@@ -40,7 +40,7 @@ async def handle_ask_faculty(call: types.CallbackQuery, callback_data: NumCallba
     await state.set_state(RegisterUserState.Form)
 
 
-async def handle_ask_form(call: types.CallbackQuery, callback_data: NumCallbackData, state: FSMContext, groups_database: database.GroupsDatabase):
+async def handle_ask_form(call: types.CallbackQuery, callback_data: NumCallback, state: FSMContext, groups_database: database.GroupsDatabase):
     await call.answer()
     await state.update_data(form=callback_data.num)
     
@@ -57,7 +57,7 @@ async def handle_ask_form(call: types.CallbackQuery, callback_data: NumCallbackD
     await state.set_state(RegisterUserState.Stage)
 
 
-async def handle_ask_stage(call: types.CallbackQuery, callback_data: NumCallbackData, state: FSMContext, groups_database: database.GroupsDatabase):
+async def handle_ask_stage(call: types.CallbackQuery, callback_data: NumCallback, state: FSMContext, groups_database: database.GroupsDatabase):
     await call.answer()
     await state.update_data(stage=callback_data.num)
     
@@ -75,7 +75,7 @@ async def handle_ask_stage(call: types.CallbackQuery, callback_data: NumCallback
     await state.set_state(RegisterUserState.Course)
 
 
-async def handle_ask_course(call: types.CallbackQuery, callback_data: NumCallbackData, state: FSMContext, groups_database: database.GroupsDatabase):
+async def handle_ask_course(call: types.CallbackQuery, callback_data: NumCallback, state: FSMContext, groups_database: database.GroupsDatabase):
     await call.answer()
     await state.update_data(course=callback_data.num)
     
@@ -94,7 +94,7 @@ async def handle_ask_course(call: types.CallbackQuery, callback_data: NumCallbac
     await state.set_state(RegisterUserState.Group)
 
 
-async def handle_ask_group(call: types.CallbackQuery, callback_data: NumCallbackData, state: FSMContext, groups_database: database.GroupsDatabase):
+async def handle_ask_group(call: types.CallbackQuery, callback_data: NumCallback, state: FSMContext, groups_database: database.GroupsDatabase):
     await call.answer()
     
     faculty: int = await state.get_value("faculty")
@@ -110,10 +110,10 @@ async def handle_ask_group(call: types.CallbackQuery, callback_data: NumCallback
     
     builder = InlineKeyboardBuilder()
     builder.row(
-        types.InlineKeyboardButton(text='1', callback_data=NumCallbackData(num=1).pack()),
-        types.InlineKeyboardButton(text='2', callback_data=NumCallbackData(num=2).pack())
+        types.InlineKeyboardButton(text='1', callback_data=NumCallback(num=1).pack()),
+        types.InlineKeyboardButton(text='2', callback_data=NumCallback(num=2).pack())
     )
-    builder.row(types.InlineKeyboardButton(text='Без подгруппы', callback_data=NumCallbackData(num=0).pack()))
+    builder.row(types.InlineKeyboardButton(text='Без подгруппы', callback_data=NumCallback(num=0).pack()))
     builder.row(keyboards.CANCEL_BUTTON)
     
     await call.message.edit_text(f"Группа: <b>{group.name}</b>\n"
@@ -123,7 +123,7 @@ async def handle_ask_group(call: types.CallbackQuery, callback_data: NumCallback
     await state.set_state(RegisterUserState.SubGroup)
     
 
-async def handle_ask_subgroup(call: types.CallbackQuery, callback_data: NumCallbackData, state: FSMContext, users_database: database.UsersDatabase):
+async def handle_ask_subgroup(call: types.CallbackQuery, callback_data: NumCallback, state: FSMContext, users_database: database.UsersDatabase):
     await call.answer()
     
     data = await state.get_data()
@@ -141,7 +141,7 @@ async def handle_ask_subgroup(call: types.CallbackQuery, callback_data: NumCallb
     
     await state.clear()
     
-    logger.info(f"Registered user with the id {user_id}")
+    logger.info(f"Registered user with the id '{user_id}'")
     
 async def handle_cancel(call: types.CallbackQuery, state: FSMContext):
     logger.info(f"User '{call.from_user.id}' has cancelled registration")
@@ -154,9 +154,9 @@ async def handle_cancel(call: types.CallbackQuery, state: FSMContext):
 def register(router: Router):
     router.message.register(handle_configure_group, StateFilter(None), F.text == keyboards.CONFIGURE_GROUP_BUTTON.text)
     router.callback_query.register(handle_cancel, StateFilter(RegisterUserState), F.data == keyboards.CANCEL_BUTTON.callback_data)
-    router.callback_query.register(handle_ask_faculty, StateFilter(RegisterUserState.Faculty), NumCallbackData.filter())
-    router.callback_query.register(handle_ask_form, StateFilter(RegisterUserState.Form), NumCallbackData.filter())
-    router.callback_query.register(handle_ask_stage, StateFilter(RegisterUserState.Stage), NumCallbackData.filter())
-    router.callback_query.register(handle_ask_course, StateFilter(RegisterUserState.Course), NumCallbackData.filter())
-    router.callback_query.register(handle_ask_group, StateFilter(RegisterUserState.Group), NumCallbackData.filter())
-    router.callback_query.register(handle_ask_subgroup, StateFilter(RegisterUserState.SubGroup), NumCallbackData.filter())
+    router.callback_query.register(handle_ask_faculty, StateFilter(RegisterUserState.Faculty), NumCallback.filter())
+    router.callback_query.register(handle_ask_form, StateFilter(RegisterUserState.Form), NumCallback.filter())
+    router.callback_query.register(handle_ask_stage, StateFilter(RegisterUserState.Stage), NumCallback.filter())
+    router.callback_query.register(handle_ask_course, StateFilter(RegisterUserState.Course), NumCallback.filter())
+    router.callback_query.register(handle_ask_group, StateFilter(RegisterUserState.Group), NumCallback.filter())
+    router.callback_query.register(handle_ask_subgroup, StateFilter(RegisterUserState.SubGroup), NumCallback.filter())

@@ -8,8 +8,8 @@ import constants
 import keyboards
 import database
 import utils
-from states import MainState
-from callbacks import NumCallbackData, NotificationCompleteCallbackData
+from states import MainState, NoteEditState
+from callbacks import NumCallback, NotificationCompleteCallback, NoteEditCallback
 from handlers.utils import check_user_exists
 
 MENU_MY_DEADLINES_ID = 1
@@ -17,7 +17,7 @@ MENU_SETTINGS_ID = 2
 
 async def handle_start(message: types.Message, users_database: database.UsersDatabase, notes_database: database.NotesDatabase):
     users_database.delete_by_id(message.from_user.id)
-    notes_database.delete_by_user_id(message.from_user.id)
+    notes_database.delete_all_by_user_id(message.from_user.id)
     
     await message.reply(f"Привет! Я <b>{constants.BOT_NAME}</b> – помогу организовать учебный процесс. Я буду запоминать твои заметки и дедлайны, привязывая их к расписанию.",
                         reply_markup=keyboards.START_KEYBOARD)
@@ -35,8 +35,8 @@ async def handle_menu(message: types.Message, state: FSMContext, users_database:
         return
     
     keyboard = InlineKeyboardBuilder()
-    keyboard.add(types.InlineKeyboardButton(text="1", callback_data=NumCallbackData(num=MENU_MY_DEADLINES_ID).pack()))
-    keyboard.add(types.InlineKeyboardButton(text="2", callback_data=NumCallbackData(num=MENU_SETTINGS_ID).pack()))
+    keyboard.add(types.InlineKeyboardButton(text="1", callback_data=NumCallback(num=MENU_MY_DEADLINES_ID).pack()))
+    keyboard.add(types.InlineKeyboardButton(text="2", callback_data=NumCallback(num=MENU_SETTINGS_ID).pack()))
     keyboard.row(keyboards.CANCEL_BUTTON)
     
     await message.reply("<b>Меню</b>\n\n"
@@ -54,9 +54,9 @@ async def handle_settings(call: types.CallbackQuery, state: FSMContext, users_da
     reminder_times_text = utils.user_reminder_times_to_text(user)
     
     builder = InlineKeyboardBuilder()
-    builder.add(types.InlineKeyboardButton(text="1", callback_data=NumCallbackData(num=1).pack()))
-    builder.add(types.InlineKeyboardButton(text="2", callback_data=NumCallbackData(num=2).pack()))
-    builder.add(types.InlineKeyboardButton(text="3", callback_data=NumCallbackData(num=3).pack()))
+    builder.add(types.InlineKeyboardButton(text="1", callback_data=NumCallback(num=1).pack()))
+    builder.add(types.InlineKeyboardButton(text="2", callback_data=NumCallback(num=2).pack()))
+    builder.add(types.InlineKeyboardButton(text="3", callback_data=NumCallback(num=3).pack()))
     # builder.add(types.InlineKeyboardButton(text="4", callback_data=NumCallbackData(num=4).pack()))
     # builder.add(types.InlineKeyboardButton(text="5", callback_data=NumCallbackData(num=5).pack()))
     # builder.add(types.InlineKeyboardButton(text="6", callback_data=NumCallbackData(num=6).pack()))
@@ -78,6 +78,8 @@ async def handle_my_deadlines(call: types.CallbackQuery, state: FSMContext, note
     count, notes = notes_database.get_notes_by_user_id(call.from_user.id)
     
     if count > 0:
+        builder = InlineKeyboardBuilder()
+        
         notes = list(notes)
         
         subject_notes = filter(lambda n: n.subject_id is not None, notes)
@@ -87,42 +89,49 @@ async def handle_my_deadlines(call: types.CallbackQuery, state: FSMContext, note
         sorted_personal_notes = sorted(personal_notes, key=lambda n: n.due_date)
         
         msg_text = ""
-        i = 0
+        i = 1
         
         grouped_notes = groupby(sorted_subject_notes, lambda n: n.subject_id)
         for subject, notes in grouped_notes:
             if subject is None:
                 continue
-            msg_text += f"<b>{subject}</b>\n"
+            msg_text += f"<b>{subject}</b>:\n"
             for note in notes:
                 with utils.time_locale('ru_RU.UTF-8'):
                     date_text: str = note.due_date.strftime("%d %b %Y")
-                msg_text += f"    {i+1}) "
+                msg_text += f"    {i}) "
                 if note.is_completed:
                     msg_text += f"<s>\"{note.text}\" — к {date_text}</s>"
                 else:
                     msg_text += f"\"{note.text}\" — к {date_text}"
-                i += 1
                 msg_text += '\n'
+                builder.add(types.InlineKeyboardButton(text=str(i), callback_data=NoteEditCallback(note_id=note.id).pack()))
+                i += 1
             msg_text += "\n"
             
-        msg_text += "<b>Личные заметки</b>\n"
+        msg_text += "<b>Личные заметки</b>:\n"
         for note in sorted_personal_notes:
             with utils.time_locale('ru_RU.UTF-8'):
                 date_text: str = note.due_date.strftime("%d %b %Y")
-            msg_text += f"    {i+1}) "
+            msg_text += f"    {i}) "
             if note.is_completed:
                 msg_text += f"<s>\"{note.text}\" — к {date_text}</s>"
             else:
                 msg_text += f"\"{note.text}\" — к {date_text}"
-            i += 1
             msg_text += '\n'
+            builder.add(types.InlineKeyboardButton(text=str(i), callback_data=NoteEditCallback(note_id=note.id).pack()))
+            i += 1
             
-        await call.message.edit_text(f"<b>Ваши дедлайны:</b>\n\n{msg_text}")
+        builder.row(keyboards.CANCEL_BUTTON)
+            
+        await call.message.edit_text("<b>Ваши дедлайны:</b>\n\n"
+                                     "Для внесения изменений нажмите на кнопку, соответствующей номеру дедлайна.\n\n"
+                                     f"{msg_text}",
+                                     reply_markup=builder.as_markup(resize_keyboard=True))
+        await state.set_state(NoteEditState.Menu)
     else:
         await call.message.edit_text("У вас пока нет дедлайнов.")
-        
-    await state.clear()
+        await state.clear()
 
 
 async def handle_admins_info(call: types.CallbackQuery, state: FSMContext):
@@ -136,7 +145,7 @@ async def handle_admins_info(call: types.CallbackQuery, state: FSMContext):
 
 async def handle_notification_complete(
     call: types.CallbackQuery,
-    callback_data: NotificationCompleteCallbackData,
+    callback_data: NotificationCompleteCallback,
     notes_database: database.NotesDatabase
 ):
     notes_database.update_note_completed(callback_data.note_id, True)
@@ -149,7 +158,8 @@ def register(router: Router):
     
     router.message.register(handle_start, CommandStart())
     router.message.register(handle_menu, StateFilter(None), Command("menu"))
-    router.callback_query.register(handle_settings, StateFilter(MainState.Menu), NumCallbackData.filter(F.num == MENU_SETTINGS_ID))
-    router.callback_query.register(handle_my_deadlines, StateFilter(MainState.Menu), NumCallbackData.filter(F.num == MENU_MY_DEADLINES_ID))
-    router.callback_query.register(handle_admins_info, StateFilter(MainState.Settings), NumCallbackData.filter(F.num == 3))
-    router.callback_query.register(handle_notification_complete, StateFilter(None), NotificationCompleteCallbackData.filter())
+    
+    router.callback_query.register(handle_settings, StateFilter(MainState.Menu), NumCallback.filter(F.num == MENU_SETTINGS_ID))
+    router.callback_query.register(handle_my_deadlines, StateFilter(MainState.Menu), NumCallback.filter(F.num == MENU_MY_DEADLINES_ID))
+    router.callback_query.register(handle_admins_info, StateFilter(MainState.Settings), NumCallback.filter(F.num == 3))
+    router.callback_query.register(handle_notification_complete, StateFilter(None), NotificationCompleteCallback.filter())

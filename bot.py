@@ -9,7 +9,9 @@ from aiogram import types
 from datetime import datetime
 import logging
 
-from handlers import base_handler, register_handler, configure_user_handler, configure_reminders_handler, reminder_creation_handler
+from handlers import base_handler, register_handler, configure_user_handler, \
+                        configure_reminders_handler, reminder_creation_handler, \
+                        reminder_edit_handler
 
 import utils
 import database
@@ -29,7 +31,7 @@ async def update_groups_and_clear_schedules(time: str, groups_database: database
         await asyncio.sleep(utils.seconds_before_time(time))
 
 async def send_notification(note: models.UserNote, now: datetime):
-    keyboard = types.InlineKeyboardMarkup(inline_keyboard=[[types.InlineKeyboardButton(text="✅ Отметить как «Выполненное»", callback_data=callbacks.NotificationCompleteCallbackData(note_id=note.id).pack())]], resize_keyboard=True)
+    keyboard = types.InlineKeyboardMarkup(inline_keyboard=[[types.InlineKeyboardButton(text="✅ Отметить как «Выполненное»", callback_data=callbacks.NotificationCompleteCallback(note_id=note.id).pack())]], resize_keyboard=True)
     
     remaining_text = utils.seconds_to_text((note.due_date - now).total_seconds())
     
@@ -98,6 +100,7 @@ async def main():
     configure_user_router = Router()
     configure_reminders_router = Router()
     reminder_creation_router = Router()
+    reminder_edit_router = Router()
     base_router = Router()
     
     register_handler.register(registration_router)
@@ -105,6 +108,7 @@ async def main():
     configure_reminders_handler.register(configure_reminders_router)
     base_handler.register(base_router)
     reminder_creation_handler.register(reminder_creation_router)
+    reminder_edit_handler.register(reminder_edit_router)
     
     dp = Dispatcher(
         groups_database=database.GroupsDatabase(),
@@ -119,6 +123,7 @@ async def main():
     dp.include_router(configure_user_router)
     dp.include_router(configure_reminders_router)
     dp.include_router(base_router)
+    dp.include_router(reminder_edit_router)
     dp.include_router(reminder_creation_router)
     
     setup_dialogs(dp)

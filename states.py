@@ -29,3 +29,7 @@ class NoteCreationState(StatesGroup):
     NoSubjectCurrently = State()
     AskDueDate = State()
     AskCustomSubject = State()
+    
+class NoteEditState(StatesGroup):
+    Menu = State()
+    ChooseOption = State()

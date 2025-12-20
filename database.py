@@ -142,11 +142,26 @@ class NotesDatabase:
             self.cur.execute(f"UPDATE {NotesDatabase.DATABASE_NAME} SET subject_id = ?, content = ?, due_date = ?, reminded_times = ?, is_completed = ? WHERE id = ?",
                              (note.subject_id, note.text, int(note.due_date.timestamp()), note.reminded_times, note.is_completed, note.id))
             self.db.commit()
+            
+    def delete_note_by_id(self, note_id: models.UserId):
+        with self.lock:
+            self.cur.execute(f"DELETE FROM {NotesDatabase.DATABASE_NAME} WHERE id = ?", (note_id,))
+            self.db.commit()
 
-    def delete_by_user_id(self, user_id: models.UserId):
+    def delete_all_by_user_id(self, user_id: models.UserId):
         with self.lock:
             self.cur.execute(f"DELETE FROM {NotesDatabase.DATABASE_NAME} WHERE user_id = ?", (user_id,))
             self.db.commit()
+
+    def get_note_by_id(self, note_id: int) -> Optional[models.UserNote]:
+        with self.lock:
+            self.cur.execute(f"SELECT * FROM {NotesDatabase.DATABASE_NAME} WHERE id = ?", (note_id,))
+            row = self.cur.fetchone()
+            
+        if row is None:
+            return None
+        
+        return NotesDatabase.row_to_note(row)
 
     def get_notes_by_user_id(self, user_id: models.UserId) -> tuple[int, Iterable[models.UserNote]]:
         with self.lock:
@@ -169,6 +184,16 @@ class NotesDatabase:
     def update_note_completed(self, note_id: int, is_completed: bool):
         with self.lock:
             self.cur.execute(f"UPDATE {NotesDatabase.DATABASE_NAME} SET is_completed = ? WHERE id = ?", (is_completed, note_id))
+            self.db.commit()
+    
+    def update_note_text(self, note_id: int, new_text: str):
+        with self.lock:
+            self.cur.execute(f"UPDATE {NotesDatabase.DATABASE_NAME} SET content = ? WHERE id = ?", (new_text, note_id))
+            self.db.commit()
+        
+    def update_note_due_date(self, note_id: int, new_due_date: datetime):
+        with self.lock:
+            self.cur.execute(f"UPDATE {NotesDatabase.DATABASE_NAME} SET due_date = ? WHERE id = ?", (int(new_due_date.timestamp()), note_id))
             self.db.commit()
         
     def close(self):
