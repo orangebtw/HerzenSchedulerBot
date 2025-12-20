@@ -8,8 +8,6 @@ START_KEYBOARD = types.ReplyKeyboardMarkup(keyboard=[[CONFIGURE_GROUP_BUTTON]], 
 SETTINGS_BUTTON = types.KeyboardButton(text="⚙️ Настройки")
 MY_DEADLINES_BUTTON = types.KeyboardButton(text="📅 Мои дедлайны")
 
-MAIN_KEYBOARD = types.ReplyKeyboardMarkup(keyboard=[[MY_DEADLINES_BUTTON], [SETTINGS_BUTTON]], resize_keyboard=True)
-
 INLINE_YES_BUTTON = types.InlineKeyboardButton(text="Да", callback_data='yes')
 INLINE_NO_BUTTON = types.InlineKeyboardButton(text="Нет", callback_data='no')
 
