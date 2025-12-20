@@ -137,7 +137,8 @@ async def handle_ask_subgroup(call: types.CallbackQuery, callback_data: NumCallb
     await call.message.edit_text("<b>Отлично, всё готово!</b> 🎉")
     
     await call.message.answer("Теперь я могу привязывать твои заметки к расписанию.\n"
-                              "Просто напиши мне что-нибудь во время пары — я пойму, к какому предмету это относится.")
+                              "Просто напиши мне что-нибудь во время пары — я пойму, к какому предмету это относится.",
+                              reply_markup=types.ReplyKeyboardRemove())
     
     await state.clear()
     
@@ -149,7 +150,7 @@ async def handle_cancel(call: types.CallbackQuery, state: FSMContext):
     await state.clear()
     
     await call.answer()
-    await call.message.edit_text("Регистрация отменена.", reply_markup=keyboards.START_KEYBOARD)
+    await call.message.edit_text("Регистрация отменена.")
     
 def register(router: Router):
     router.message.register(handle_configure_group, StateFilter(None), F.text == keyboards.CONFIGURE_GROUP_BUTTON.text)

@@ -283,6 +283,21 @@ async def on_create_note_button_click(call: types.CallbackQuery, button: Button,
     await manager.switch_to(DueDateDialogState.AskCustomDueDate)
 
 
+async def on_custom_subject_button_click(call: types.CallbackQuery, button: Button, manager: DialogManager):
+    state: FSMContext = manager.middleware_data['state']
+    schedules_database: database.SchedulesDatabase = manager.middleware_data['schedules_database']
+    users_database: database.SchedulesDatabase = manager.middleware_data['users_database']
+    user: models.User = manager.start_data['user']
+    note_text: models.User = manager.start_data['note_text']
+    
+    await manager.done()
+    
+    await state.update_data(user=user)
+    await state.update_data(note_text=note_text)
+    
+    await handle_subject_not_correct(call, state, schedules_database, users_database)
+
+
 async def on_cancel_button_click(call: types.CallbackQuery, button: Button, manager: DialogManager):
     await call.message.edit_text("Отменено")
 
@@ -299,6 +314,7 @@ def register(router: Router):
             Const("❗ Сейчас не идёт никакой пары"),
             Button(text=Const("🗒️ Создать личную заметку"), id='create_note', on_click=on_create_note_button_click),
             Button(text=Format("Недавняя пара: {recent_subject}"), id="select_recent_subject", on_click=on_recent_subject_button_click),
+            Button(text=Format("Выбрать другой предмет"), id="select_custom_subject", on_click=on_custom_subject_button_click),
             Cancel(text=Const("Отмена"), on_click=on_cancel_button_click),
             getter=no_subject_currently_getter,
             state=DueDateDialogState.NoSubjectCurrently,
