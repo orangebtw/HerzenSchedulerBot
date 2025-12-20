@@ -22,7 +22,7 @@ from itertools import islice
 from cytoolz.itertoolz import unique
 
 from states import NoteCreationState
-from utils import NumCallbackData
+from callbacks import NumCallbackData
 from handlers.utils import check_user_exists
 
 import operator
@@ -322,7 +322,7 @@ async def on_create_note_button_click(call: types.CallbackQuery, button: Button,
 
 
 async def on_cancel_button_click(call: types.CallbackQuery, button: Button, manager: DialogManager):
-    await call.message.edit_text("Отменено.")
+    await call.message.edit_text("Отменено")
 
 
 def register(router: Router):

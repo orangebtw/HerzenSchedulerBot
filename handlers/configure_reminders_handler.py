@@ -9,6 +9,7 @@ import utils
 import keyboards
 import models
 import database
+from callbacks import NumCallbackData
 from states import ConfigureReminderState, MainState
 
 logger = logging.getLogger(__name__)
@@ -17,9 +18,9 @@ async def handle_configure_reminders(call: types.CallbackQuery, state: FSMContex
     await call.answer()
     
     builder = InlineKeyboardBuilder()
-    builder.add(types.InlineKeyboardButton(text="1 раз", callback_data=utils.NumCallbackData(num=1).pack()))
-    builder.add(types.InlineKeyboardButton(text="2 раза", callback_data=utils.NumCallbackData(num=2).pack()))
-    builder.add(types.InlineKeyboardButton(text="3 раза", callback_data=utils.NumCallbackData(num=3).pack()))
+    builder.add(types.InlineKeyboardButton(text="1 раз", callback_data=NumCallbackData(num=1).pack()))
+    builder.add(types.InlineKeyboardButton(text="2 раза", callback_data=NumCallbackData(num=2).pack()))
+    builder.add(types.InlineKeyboardButton(text="3 раза", callback_data=NumCallbackData(num=3).pack()))
     builder.row(keyboards.CANCEL_BUTTON)
     
     await call.message.edit_text("Укажите сколько раз вам напомнить о дедлайне?", reply_markup=builder.as_markup())
@@ -27,7 +28,7 @@ async def handle_configure_reminders(call: types.CallbackQuery, state: FSMContex
     await state.set_state(ConfigureReminderState.AskTime)
 
 
-async def handle_ask_time(call: types.CallbackQuery, callback_data: utils.NumCallbackData, state: FSMContext):
+async def handle_ask_time(call: types.CallbackQuery, callback_data: NumCallbackData, state: FSMContext):
     await call.answer()
     
     range_from = callback_data.num
@@ -101,9 +102,9 @@ async def handle_get_time(message: types.Message, state: FSMContext, users_datab
         
         await state.clear()
         
-        logger.info(f"User {message.from_user.id} updated reminder times")
+        logger.info(f"User '{message.from_user.id}' updated reminder times")
 
 def register(router: Router):
-    router.callback_query.register(handle_configure_reminders, StateFilter(MainState.Settings), utils.NumCallbackData.filter(F.num == 2))
-    router.callback_query.register(handle_ask_time, StateFilter(ConfigureReminderState.AskTime), utils.NumCallbackData.filter())
+    router.callback_query.register(handle_configure_reminders, StateFilter(MainState.Settings), NumCallbackData.filter(F.num == 2))
+    router.callback_query.register(handle_ask_time, StateFilter(ConfigureReminderState.AskTime), NumCallbackData.filter())
     router.message.register(handle_get_time, StateFilter(ConfigureReminderState.GetTime), F.text.isdigit())

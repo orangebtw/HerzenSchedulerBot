@@ -9,6 +9,7 @@ class RegisterUserState(StatesGroup):
     SubGroup = State()
     
 class MainState(StatesGroup):
+    Menu = State()
     Settings = State()
     
 class ConfigureUserState(StatesGroup):

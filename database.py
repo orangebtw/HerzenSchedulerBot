@@ -165,11 +165,6 @@ class NotesDatabase:
             self.cur.execute(f"SELECT * FROM {NotesDatabase.DATABASE_NAME} WHERE is_completed IS FALSE")
             rows = self.cur.fetchall() 
         return len(rows), map(NotesDatabase.row_to_note, rows)
-        
-    def update_note_reminded_times(self, note_id: int, reminded_times: int):
-        with self.lock:
-            self.cur.execute(f"UPDATE {NotesDatabase.DATABASE_NAME} SET reminded_times = ? WHERE id = ?", (reminded_times, note_id))
-            self.db.commit()
             
     def update_note_completed(self, note_id: int, is_completed: bool):
         with self.lock:

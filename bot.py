@@ -4,6 +4,7 @@ from aiogram_dialog import setup_dialogs
 
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums.parse_mode import ParseMode
+from aiogram import types
 
 from datetime import datetime
 import logging
@@ -14,6 +15,7 @@ import utils
 import database
 import constants
 import models
+import callbacks
 
 logger = logging.getLogger(__name__)
 
@@ -27,17 +29,20 @@ async def update_groups_and_clear_schedules(time: str, groups_database: database
         await asyncio.sleep(utils.seconds_before_time(time))
 
 async def send_notification(note: models.UserNote, now: datetime):
+    keyboard = types.InlineKeyboardMarkup(inline_keyboard=[[types.InlineKeyboardButton(text="✅ Отметить как «Выполненное»", callback_data=callbacks.NotificationCompleteCallbackData(note_id=note.id).pack())]], resize_keyboard=True)
+    
     remaining_text = utils.seconds_to_text((note.due_date - now).total_seconds())
     
     if note.subject_id is not None:
-        await bot.send_message(note.user_id, text=f"📣 <b>Напоминание о дедлайне</b>\n\nПредмет: <b>{note.subject_id}</b>\nЗадание: \"{note.text}\"\n\nДо дедлайна осталось: <b>{remaining_text}</b>.")
+        await bot.send_message(note.user_id, text=f"📣 <b>Напоминание о дедлайне</b>\n\nПредмет: <b>{note.subject_id}</b>\nЗадание: \"{note.text}\"\n\nДо дедлайна осталось: <b>{remaining_text}</b>.", reply_markup=keyboard)
     else:
         with utils.time_locale('ru_RU.UTF-8'):
             date_text: str = note.due_date.strftime("%d %b %Y")
-        await bot.send_message(note.user_id, text=f"📣 <b>Напоминание о дедлайне</b>\n\nЧерез <b>{remaining_text}</b> истечёт дедлайн по личной заметки:\n\"{note.text}\" к <b>{date_text}</b>.")
+        await bot.send_message(note.user_id, text=f"📣 <b>Напоминание о дедлайне</b>\n\nЧерез <b>{remaining_text}</b> истечёт дедлайн по личной заметки:\n\"{note.text}\" к <b>{date_text}</b>.", reply_markup=keyboard)
 
 async def notify_of_reminders(notes_database: database.NotesDatabase, users_database: database.UsersDatabase):
     while True:
+        logger.info("Checking reminders to notify...")
         now = datetime.now(tz=utils.DEFAULT_TIMEZONE)
         cache_users: dict[models.UserId, models.User] = {}
         
@@ -54,7 +59,7 @@ async def notify_of_reminders(notes_database: database.NotesDatabase, users_data
             user = cache_users[note.user_id]
             
             if user is None:
-                logger.error(f"Failed to check for reminders: user {note.user_id} not found")
+                logger.error(f"Failed to check for reminders: user '{note.user_id}' not found")
                 continue
             
             if note.reminded_times >= sum((True for t in user.reminder_times if t is not None)):
@@ -65,9 +70,9 @@ async def notify_of_reminders(notes_database: database.NotesDatabase, users_data
                     try:
                         await send_notification(note, now)
                         note.reminded_times += 1
-                        logger.info(f"Sent {note.reminded_times} reminder to user {note.user_id}")
+                        logger.info(f"Sent {note.reminded_times} reminder to user '{note.user_id}'")
                     except Exception as e:
-                        logger.error(f"Failed to send {note.reminded_times} reminder to user {note.user_id}: {e}")
+                        logger.error(f"Failed to send {note.reminded_times} reminder to user '{note.user_id}': {e}")
                     await asyncio.sleep(0.5)
             
             notes_database.update_note(note)
@@ -117,6 +122,12 @@ async def main():
     dp.include_router(reminder_creation_router)
     
     setup_dialogs(dp)
+    
+    commands = [
+        types.BotCommand(command="start", description="Пройти регистрацию"),
+        types.BotCommand(command="menu", description="Меню"),
+    ]
+    await bot.set_my_commands(commands)
     
     await dp.start_polling(bot)
     

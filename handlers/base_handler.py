@@ -1,6 +1,6 @@
 from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
-from aiogram.filters import CommandStart, StateFilter
+from aiogram.filters import CommandStart, StateFilter, Command
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from itertools import groupby
 
@@ -9,8 +9,11 @@ import keyboards
 import database
 import utils
 from states import MainState
-from utils import NumCallbackData
+from callbacks import NumCallbackData, NotificationCompleteCallbackData
 from handlers.utils import check_user_exists
+
+MENU_MY_DEADLINES_ID = 1
+MENU_SETTINGS_ID = 2
 
 async def handle_start(message: types.Message, users_database: database.UsersDatabase, notes_database: database.NotesDatabase):
     users_database.delete_by_id(message.from_user.id)
@@ -24,15 +27,28 @@ async def handle_cancel(call: types.CallbackQuery, state: FSMContext):
     await state.clear()
     
     await call.answer()
-    await call.message.edit_text("Настройка отменена.")
+    await call.message.edit_text("Отменено")
 
-async def handle_settings(message: types.Message, state: FSMContext, users_database: database.UsersDatabase):
+
+async def handle_menu(message: types.Message, state: FSMContext, users_database: database.UsersDatabase):
     if not await check_user_exists(message, users_database=users_database):
         return
     
-    assert(message.from_user is not None)
+    keyboard = InlineKeyboardBuilder()
+    keyboard.add(types.InlineKeyboardButton(text="1", callback_data=NumCallbackData(num=MENU_MY_DEADLINES_ID).pack()))
+    keyboard.add(types.InlineKeyboardButton(text="2", callback_data=NumCallbackData(num=MENU_SETTINGS_ID).pack()))
+    keyboard.row(keyboards.CANCEL_BUTTON)
     
-    user = users_database.get_user_by_id(message.from_user.id)
+    await message.reply("<b>Меню</b>\n\n"
+                        "1) 📅 Мои дедлайны\n\n"
+                        "2) ⚙️ Настройки\n",
+                        reply_markup=keyboard.as_markup())
+    
+    await state.set_state(MainState.Menu)
+    
+
+async def handle_settings(call: types.CallbackQuery, state: FSMContext, users_database: database.UsersDatabase):
+    user = users_database.get_user_by_id(call.from_user.id)
     assert(user is not None)
     
     reminder_times_text = utils.user_reminder_times_to_text(user)
@@ -46,7 +62,7 @@ async def handle_settings(message: types.Message, state: FSMContext, users_datab
     # builder.add(types.InlineKeyboardButton(text="6", callback_data=NumCallbackData(num=6).pack()))
     builder.row(keyboards.CANCEL_BUTTON)
     
-    await message.answer("<b>Выберите номер пункта, который хотите изменить:</b>\n"
+    await call.message.edit_text("<b>Выберите номер пункта, который хотите изменить:</b>\n"
                          f"1. 🎓  Группа: {user.group.name}\n"
                          f"2. 🔔  Напоминания о дедлайнах: {reminder_times_text}\n"
                         #  f"3. 📊  Сводка: В 18:00\n"
@@ -58,11 +74,8 @@ async def handle_settings(message: types.Message, state: FSMContext, users_datab
     await state.set_state(MainState.Settings)
 
 
-async def handle_my_deadlines(message: types.Message, state: FSMContext, users_database: database.UsersDatabase, notes_database: database.NotesDatabase):
-    if not await check_user_exists(message, users_database=users_database):
-        return
-    
-    count, notes = notes_database.get_notes_by_user_id(message.from_user.id)
+async def handle_my_deadlines(call: types.CallbackQuery, state: FSMContext, notes_database: database.NotesDatabase):
+    count, notes = notes_database.get_notes_by_user_id(call.from_user.id)
     
     if count > 0:
         notes = list(notes)
@@ -105,9 +118,11 @@ async def handle_my_deadlines(message: types.Message, state: FSMContext, users_d
             i += 1
             msg_text += '\n'
             
-        await message.reply(f"<b>Ваши дедлайны:</b>\n\n{msg_text}")
+        await call.message.edit_text(f"<b>Ваши дедлайны:</b>\n\n{msg_text}")
     else:
-        await message.reply("У вас пока нет дедлайнов.")
+        await call.message.edit_text("У вас пока нет дедлайнов.")
+        
+    await state.clear()
 
 
 async def handle_admins_info(call: types.CallbackQuery, state: FSMContext):
@@ -119,10 +134,22 @@ async def handle_admins_info(call: types.CallbackQuery, state: FSMContext):
     await state.clear()
 
 
-def register(router: Router):
-    router.message.register(handle_start, CommandStart())
-    router.callback_query.register(handle_cancel, F.data == keyboards.CANCEL_BUTTON.callback_data)
-    router.message.register(handle_settings, StateFilter(None), F.text == keyboards.SETTINGS_BUTTON.text)
-    router.message.register(handle_my_deadlines, StateFilter(None), F.text == keyboards.MY_DEADLINES_BUTTON.text)
+async def handle_notification_complete(
+    call: types.CallbackQuery,
+    callback_data: NotificationCompleteCallbackData,
+    notes_database: database.NotesDatabase
+):
+    notes_database.update_note_completed(callback_data.note_id, True)
     
-    router.callback_query.register(handle_admins_info, StateFilter(MainState.Settings), utils.NumCallbackData.filter(F.num == 3))
+    await call.answer("Задание помечено как выполненное")
+    await call.message.edit_reply_markup(reply_markup=None)
+
+def register(router: Router):
+    router.callback_query.register(handle_cancel, F.data == keyboards.CANCEL_BUTTON.callback_data)
+    
+    router.message.register(handle_start, CommandStart())
+    router.message.register(handle_menu, StateFilter(None), Command("menu"))
+    router.callback_query.register(handle_settings, StateFilter(MainState.Menu), NumCallbackData.filter(F.num == MENU_SETTINGS_ID))
+    router.callback_query.register(handle_my_deadlines, StateFilter(MainState.Menu), NumCallbackData.filter(F.num == MENU_MY_DEADLINES_ID))
+    router.callback_query.register(handle_admins_info, StateFilter(MainState.Settings), NumCallbackData.filter(F.num == 3))
+    router.callback_query.register(handle_notification_complete, StateFilter(None), NotificationCompleteCallbackData.filter())

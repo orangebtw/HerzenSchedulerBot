@@ -12,9 +12,6 @@ import models
 
 DEFAULT_TIMEZONE = ZoneInfo("Europe/Moscow")
 
-class NumCallbackData(CallbackData, prefix="data-int"):
-    num: int
-
 def seconds_before_time(t: str) -> float:
     now = datetime.now(tz=DEFAULT_TIMEZONE)
     wait_for = time.fromisoformat(t)
