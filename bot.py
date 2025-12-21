@@ -8,6 +8,8 @@ from aiogram import types
 
 from datetime import datetime
 import logging
+import dotenv
+import os
 
 from handlers import base_handler, register_handler, configure_user_handler, \
                         configure_reminders_handler, reminder_creation_handler, \
@@ -15,13 +17,16 @@ from handlers import base_handler, register_handler, configure_user_handler, \
 
 import utils
 import database
-import constants
 import models
 import callbacks
 
+dotenv.load_dotenv()
+
 logger = logging.getLogger(__name__)
 
-bot = Bot(token=constants.BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+BOT_TOKEN = os.getenv("BOT_TOKEN")
+
+bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 
 async def update_groups_and_clear_schedules(time: str, groups_database: database.GroupsDatabase, schedules_database: database.SchedulesDatabase):
     while True:
