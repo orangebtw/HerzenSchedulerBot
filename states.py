@@ -33,3 +33,6 @@ class NoteCreationState(StatesGroup):
 class NoteEditState(StatesGroup):
     Menu = State()
     ChooseOption = State()
+    
+class DeleteUserDataState(StatesGroup):
+    Confirmation = State()

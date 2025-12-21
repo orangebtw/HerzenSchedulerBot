@@ -25,9 +25,10 @@ bot = Bot(token=constants.BOT_TOKEN, default=DefaultBotProperties(parse_mode=Par
 
 async def update_groups_and_clear_schedules(time: str, groups_database: database.GroupsDatabase, schedules_database: database.SchedulesDatabase):
     while True:
+        logger.info("Fetching groups and schedules...")
         groups_database.fetch_groups()
         schedules_database.clear_subjects()
-        logging.info("Fetched schedules")
+        logging.info("Successfully fetched groups and schedules")
         await asyncio.sleep(utils.seconds_before_time(time))
 
 async def send_notification(note: models.UserNote, now: datetime):
