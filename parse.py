@@ -108,11 +108,11 @@ def parse_schedule(group_id: str, subgroup_id: int | None = None) -> list[Schedu
     
     bs = bs4.BeautifulSoup(res.content, "html.parser")
     
-    # if bs.find('a', string='другую группу'):  # No classes at that period
+    if bs.find('a', string='другую группу'):  # No classes at that period
     #     last_summer_day = datetime.datetime(date_1.year, 8, 31).date()
     #     if date_1 <= last_summer_day < date_2:
     #         return parse_date_schedule(group_id, subgroup_id, last_summer_day + datetime.timedelta(days=1), date_2)
-    #     return {}, url
+        return None
     
     if bs.find('tbody'):
         courses_column = bs.find('tbody').find_all('tr')

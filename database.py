@@ -38,13 +38,12 @@ class SchedulesDatabase:
             self.schedules.clear()
         
     @contextmanager    
-    def get_subjects(self, group_id: str, subgroup: int | None = None) -> Generator[list[parse.ScheduleSubject] | None]:
+    def get_subjects(self, group: models.UserGroup) -> Generator[list[parse.ScheduleSubject] | None]:
         self.lock.acquire()
         try:
-            g = models.UserGroup(group_id, subgroup)
-            if g not in self.schedules:
-                self.schedules[g] = parse.parse_schedule(group_id, subgroup)
-            yield self.schedules[g]
+            if group not in self.schedules:
+                self.schedules[group] = parse.parse_schedule(group.id, group.subgroup)
+            yield self.schedules[group]
         finally:
             self.lock.release()
 
