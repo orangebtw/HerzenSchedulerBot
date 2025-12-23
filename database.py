@@ -2,7 +2,7 @@ import parse
 import threading
 import models
 import sqlite3
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, date
 
 from typing import Iterable, Optional, Generator
 
@@ -38,11 +38,11 @@ class SchedulesDatabase:
             self.schedules.clear()
         
     @contextmanager    
-    def get_subjects(self, group: models.UserGroup) -> Generator[list[parse.ScheduleSubject] | None]:
+    def get_subjects(self, group: models.UserGroup, date_from: date | None = None, date_to: date | None = None) -> Generator[list[parse.ScheduleSubject] | None]:
         self.lock.acquire()
         try:
             if group not in self.schedules:
-                self.schedules[group] = parse.parse_schedule(group.id, group.subgroup)
+                self.schedules[group] = parse.parse_schedule(group.id, group.subgroup, date_from, date_to)
             yield self.schedules[group]
         finally:
             self.lock.release()

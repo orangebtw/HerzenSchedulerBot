@@ -1,7 +1,7 @@
 import requests
 import bs4
 from dataclasses import dataclass
-from datetime import datetime, time
+from datetime import datetime, time, date
 import re
 
 import utils
@@ -100,8 +100,15 @@ def parse_groups() -> list[ScheduleFaculty]:
         index += 1
     return schedule_ids
 
-def parse_schedule(group_id: str, subgroup_id: int | None = None) -> list[ScheduleSubject] | None:
-    res = requests.get(f"{SCHEDULE_DATA_URL}?id_group={group_id}", {
+def parse_schedule(group_id: str, subgroup_id: int | None = None, date_from: date | None = None, date_to: date | None = None) -> list[ScheduleSubject] | None:
+    url = f"{SCHEDULE_DATA_URL}?id_group={group_id}"
+    with utils.time_locale('ru_RU.UTF-8'):
+        if date_from is not None:
+            url += f"&date1={date_from.strftime('%Y-%m-%d')}"
+        if date_to is not None:
+            url += f"&date2={date_to.strftime('%Y-%m-%d')}"
+    
+    res = requests.get(url, {
         'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36"
     })
     assert(res.status_code == 200)

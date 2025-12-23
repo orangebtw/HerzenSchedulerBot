@@ -58,7 +58,9 @@ async def handle_new_reminder(
         found_subject: parse.ScheduleSubject | None = None
         last_subject: parse.ScheduleSubject = None
         
-        with schedules_database.get_subjects(user.group.without_name()) as subjects:
+        now = utils.tz_now()
+        
+        with schedules_database.get_subjects(user.group.without_name(), date_to=now.date()) as subjects:
             last_subject = subjects[-1]
             
             for subject in subjects:
@@ -123,8 +125,8 @@ async def handle_subject_not_correct(
 
 
 def get_next_classes(schedules_database: database.SchedulesDatabase, user: models.User, subject: str, count: int) -> list[parse.ScheduleSubject]:
-    with schedules_database.get_subjects(user.group.without_name()) as schedules:
-        now = utils.tz_now()
+    now = utils.tz_now()
+    with schedules_database.get_subjects(user.group.without_name(), date_from=now.date()) as schedules:
         next_classes = islice(unique(filter(lambda subj: subj.name == subject and subj.time_end.date() > now.date(), schedules), key=lambda subj: subj.time_start.date()), count)
     return list(next_classes)
 
