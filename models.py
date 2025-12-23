@@ -7,15 +7,18 @@ import uuid
 type UserId = int
 
 @dataclass(frozen=True)
-class UserGroupWithName:
-    name: str
+class UserGroup:
     id: str
     subgroup: int | None = None
 
 @dataclass(frozen=True)
-class UserGroup:
+class UserGroupWithName:
+    name: str
     id: str
     subgroup: int | None = None
+    
+    def without_name(self) -> UserGroup:
+        return UserGroup(id=self.id, subgroup=self.subgroup)
 
 @dataclass(frozen=True)
 class UserReminderTime:

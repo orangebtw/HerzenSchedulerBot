@@ -58,7 +58,7 @@ async def handle_new_reminder(
         found_subject: parse.ScheduleSubject | None = None
         last_subject: parse.ScheduleSubject = None
         
-        with schedules_database.get_subjects(user.group.id, user.group.subgroup) as subjects:
+        with schedules_database.get_subjects(user.group.without_name()) as subjects:
             last_subject = subjects[-1]
             
             for subject in subjects:
@@ -99,7 +99,7 @@ async def handle_subject_not_correct(
     user = users_database.get_user_by_id(call.from_user.id)
     assert(user is not None)
     
-    with schedules_database.get_subjects(user.group.id, user.group.subgroup) as subjects:
+    with schedules_database.get_subjects(user.group.without_name()) as subjects:
         assert(subjects is not None)
         
     subject_names = set((subj.name for subj in subjects))
@@ -123,8 +123,9 @@ async def handle_subject_not_correct(
 
 
 def get_next_classes(schedules_database: database.SchedulesDatabase, user: models.User, subject: str, count: int) -> list[parse.ScheduleSubject]:
-    with schedules_database.get_subjects(user.group.id, user.group.subgroup) as schedules:
-        next_classes = islice(unique(filter(lambda subj: subj.name == subject, schedules), key=lambda subj: subj.time_start.date()), count)
+    with schedules_database.get_subjects(user.group.without_name()) as schedules:
+        now = utils.tz_now()
+        next_classes = islice(unique(filter(lambda subj: subj.name == subject and subj.time_end.date() > now.date(), schedules), key=lambda subj: subj.time_start.date()), count)
     return list(next_classes)
 
 
@@ -142,7 +143,7 @@ async def handle_subject_is_correct(
     
     await state.clear()
     
-    next_classes = get_next_classes(schedules_database, user, subject, 3)
+    next_classes = get_next_classes(schedules_database, user, subject.name, 3)
     if len(next_classes) > 0:
         await dialog_manager.start(DueDateDialogState.AskDueDate,
                                 mode=StartMode.RESET_STACK,
@@ -251,8 +252,15 @@ async def ask_deadline_getter(dialog_manager: DialogManager, **kwargs):
         def inner(subject: parse.ScheduleSubject) -> str:
             with utils.time_locale('ru_RU.UTF-8'):
                 delta = subject.time_start - now
-                date_text = subject.time_start .strftime("%a, %d %b")
-                return (subject.time_start, f"{date_text} (Через {delta.days} д.)")
+                date_text = subject.time_start.strftime("%a, %d %b")
+                if delta.days == 0:
+                    text = f"{date_text} (завтра)"
+                elif delta.days == 1:
+                    text = f"{date_text} (послезавтра)"
+                else:
+                    text = f"{date_text} (Через {delta.days} д.)"
+                
+                return (subject.time_start, text)
         return inner
     
     next_classes = map(map_subject(), dialog_manager.start_data['next_classes'])
