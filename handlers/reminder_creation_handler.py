@@ -10,11 +10,8 @@ from aiogram_dialog import DialogManager, StartMode, Dialog, Window
 from aiogram_dialog.widgets.kbd.button import Button
 from aiogram_dialog.widgets.kbd.state import Cancel
 from aiogram_dialog.widgets.kbd.select import Select
-from aiogram_dialog.widgets.kbd.calendar_kbd import Calendar, CalendarConfig, CalendarUserConfig, CalendarScope, CalendarScopeView, CalendarDaysView, CalendarMonthView, CalendarYearsView
-from aiogram_dialog.widgets.text import Const, Format, Text
+from aiogram_dialog.widgets.text import Const, Format
 from aiogram_dialog.widgets.kbd.group import Group
-
-from babel.dates import get_day_names, get_month_names
 
 from datetime import datetime, timedelta, date, time
 
@@ -58,9 +55,7 @@ async def handle_new_reminder(
         found_subject: parse.ScheduleSubject | None = None
         last_subject: parse.ScheduleSubject = None
         
-        now = utils.tz_now()
-        
-        with schedules_database.get_subjects(user.group.without_name(), date_to=now.date()) as subjects:
+        with schedules_database.get_subjects(user.group.without_name(), date_to=date.date()) as subjects:
             last_subject = subjects[-1]
             
             for subject in subjects:
