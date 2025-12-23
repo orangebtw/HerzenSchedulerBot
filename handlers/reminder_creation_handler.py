@@ -51,26 +51,31 @@ async def handle_new_reminder(
     assert(user is not None)
 
     async with ChatActionSender(bot=bot, chat_id=message.chat.id, action=ChatAction.TYPING):
-        date = message.date.astimezone(utils.DEFAULT_TIMEZONE)
+        msg_date = message.date.astimezone(utils.DEFAULT_TIMEZONE)
         found_subject: parse.ScheduleSubject | None = None
-        last_subject: parse.ScheduleSubject = None
+        recent_subject = None
         
-        with schedules_database.get_subjects(user.group.without_name(), date_to=date.date()) as subjects:
-            last_subject = subjects[-1]
+        with schedules_database.get_subjects(user.group.without_name(), date_to=msg_date.date()) as subjects:
+            for subj in reversed(subjects):
+                if msg_date < subj.time_end:
+                    continue
+                
+                recent_subject = subj
+                break
             
-        with schedules_database.get_subjects(user.group.without_name(), date_from=date.date()) as subjects:
+        with schedules_database.get_subjects(user.group.without_name(), date_from=msg_date.date()) as subjects:
             for subject in subjects:
                 start = subject.time_start - timedelta(minutes=3)
                 end = subject.time_end + timedelta(minutes=7)
                 
-                if start <= date <= end:
+                if start <= msg_date <= end:
                     found_subject = subject
                     break
             
         if found_subject is None:
             await dialog_manager.start(DueDateDialogState.NoSubjectCurrently,
                                        mode=StartMode.RESET_STACK,
-                                       data={'subject': last_subject.name,
+                                       data={'subject': recent_subject.name,
                                              'note_text': message.text,
                                              'user': user})
         else:

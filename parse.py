@@ -205,9 +205,21 @@ def parse_schedule(group_id: str, subgroup_id: int | None = None, date_from: dat
 
 
 if __name__ == "__main__":
+    now = utils.tz_now()
+    
     schedules = parse_groups()
-    subjects = parse_schedule(schedules[0].forms[0].stages[0].courses[0].groups[0].id)
-    print(subjects[0])
+    group = schedules[4].forms[0].stages[0].courses[1].groups[3]
+    subjects = parse_schedule(group.id, 0, date_to=now.date())
+    
+    recent_subject = None
+    
+    for subj in reversed(subjects):
+        if now < subj.time_end:
+            continue
+        recent_subject = subj
+        break
+    
+    print(recent_subject)
     # for g in groups:
     #     print(g)
 
