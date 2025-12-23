@@ -57,9 +57,9 @@ async def handle_new_reminder(
         
         with schedules_database.get_subjects(user.group.without_name(), date_to=msg_date.date()) as subjects:
             # Make sure the subjects are sorted
-            sorted_subjects = subjects.sort(key=lambda x: x.time_end, reverse=True)
+            subjects.sort(key=lambda x: x.time_end)
             
-            for subj in reversed(sorted_subjects):
+            for subj in reversed(subjects):
                 if msg_date < subj.time_end:
                     continue
                 
@@ -68,9 +68,9 @@ async def handle_new_reminder(
             
         with schedules_database.get_subjects(user.group.without_name(), date_from=msg_date.date()) as subjects:
             # Make sure the subjects are sorted
-            sorted_subjects = subjects.sort(key=lambda x: x.time_end)
+            subjects.sort(key=lambda x: x.time_end)
             
-            for subject in sorted_subjects:
+            for subject in subjects:
                 start = subject.time_start - timedelta(minutes=3)
                 end = subject.time_end + timedelta(minutes=7)
                 
