@@ -68,7 +68,7 @@ async def handle_new_reminder(
             
         with schedules_database.get_subjects(user.group.without_name(), date_from=msg_date.date()) as subjects:
             # Make sure the subjects are sorted
-            sorted_subjects = subjects.sort(key=lambda x: x.time_end, reverse=True)
+            sorted_subjects = subjects.sort(key=lambda x: x.time_end)
             
             for subject in sorted_subjects:
                 start = subject.time_start - timedelta(minutes=3)
