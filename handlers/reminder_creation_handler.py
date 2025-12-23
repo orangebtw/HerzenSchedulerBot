@@ -55,7 +55,7 @@ async def handle_new_reminder(
         found_subject: parse.ScheduleSubject | None = None
         last_subject: parse.ScheduleSubject = None
         
-        with schedules_database.get_subjects(user.group.without_name(), date_to=date.date()) as subjects:
+        with schedules_database.get_subjects(user.group.without_name(), date_from=date.date()) as subjects:
             last_subject = subjects[-1]
             
             for subject in subjects:
