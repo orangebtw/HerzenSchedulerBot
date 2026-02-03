@@ -102,6 +102,9 @@ async def main():
     logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
     logging.getLogger("aiogram.event").setLevel(logging.WARNING)
     
+    if not os.path.exists('./databases/'):
+        os.mkdir('./databases/')
+    
     registration_router = Router()
     configure_user_router = Router()
     configure_reminders_router = Router()
