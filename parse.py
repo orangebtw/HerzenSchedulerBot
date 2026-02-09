@@ -5,6 +5,7 @@ from datetime import datetime, time, date
 import re
 
 import utils
+import logging
 
 HERZEN_URL = "https://old-guide.herzen.spb.ru"
 GROUPS_URL = f"{HERZEN_URL}/static/schedule.php"
@@ -54,11 +55,15 @@ class Schedule:
     id: ScheduleFaculty
     subjects: list[ScheduleSubject]
 
-def parse_groups() -> list[ScheduleFaculty]:
+logger = logging.getLogger(__name__)
+
+def parse_groups() -> list[ScheduleFaculty] | None:
     res = requests.get(GROUPS_URL, {
         'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36"
-    })
-    assert(res.status_code == 200)
+    }, timeout=5)
+    if res.status_code != 200:
+        logger.error(f"Failed to fetch groups: {res.status_code} {res.reason}")
+        return None
     bs = bs4.BeautifulSoup(res.content, "html.parser")
     
     schedule_ids: list[ScheduleFaculty] = []
@@ -110,8 +115,10 @@ def parse_schedule(group_id: str, subgroup_id: int | None = None, date_from: dat
     
     res = requests.get(url, {
         'User-Agent': "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36"
-    })
-    assert(res.status_code == 200)
+    }, timeout=5)
+    if res.status_code != 200:
+        logger.error(f"Failed to fetch groups: {res.status_code} {res.reason}")
+        return None
     
     bs = bs4.BeautifulSoup(res.content, "html.parser")
     
@@ -208,6 +215,8 @@ if __name__ == "__main__":
     now = utils.tz_now()
     
     schedules = parse_groups()
+    assert(schedules is not None)
+    
     group = schedules[4].forms[0].stages[0].courses[1].groups[3]
     subjects = parse_schedule(group.id, 0, date_to=now.date())
     

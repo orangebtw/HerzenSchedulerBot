@@ -18,10 +18,13 @@ class GroupsDatabase:
         
     def fetch_groups(self):
         with self.lock:
-            self.groups = parse.parse_groups()
+            self.groups = parse.parse_groups() or []
         
     @contextmanager    
     def get_groups(self):
+        if len(self.groups) == 0:
+            self.fetch_groups()
+        
         self.lock.acquire()
         try:
             yield self.groups
@@ -42,8 +45,10 @@ class SchedulesDatabase:
         self.lock.acquire()
         try:
             if group not in self.schedules:
-                self.schedules[group] = parse.parse_schedule(group.id, group.subgroup, date_from, date_to)
-            yield self.schedules[group]
+                schedules = parse.parse_schedule(group.id, group.subgroup, date_from, date_to)
+                if schedules is not None:
+                    self.schedules[group] = schedules
+            yield self.schedules.get(group)
         finally:
             self.lock.release()
 
